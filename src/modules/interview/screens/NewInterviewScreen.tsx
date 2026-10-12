@@ -1,0 +1,115 @@
+import React, { useState } from "react";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Briefcase } from "lucide-react-native";
+import {
+  useTemplates,
+  useEntitlements,
+  useCreateInterview,
+} from "@modules/interview/hooks/useInterviews";
+import { InterviewsStackParamList } from "@modules/interview/InterviewsNavigator";
+import { VerifyEmailCard } from "@modules/auth/components/VerifyEmailCard";
+import { apiErrorCode, apiErrorMessage } from "@api/apiClient";
+import { useAuthStore } from "@shared/store/useAuthStore";
+import {
+  Screen,
+  Card,
+  ListRow,
+  Divider,
+  Button,
+  Banner,
+  Skeleton,
+  ErrorState,
+  EmptyState,
+  VStack,
+} from "@shared/ui";
+
+type Nav = NativeStackNavigationProp<InterviewsStackParamList>;
+
+export default function NewInterviewScreen() {
+  const navigation = useNavigation<Nav>();
+  const verified = useAuthStore((s) => s.user?.emailVerified ?? false);
+  const templates = useTemplates();
+  const credits = useEntitlements();
+  const create = useCreateInterview();
+  const [picked, setPicked] = useState<string | null>(null);
+
+  const available = credits.data?.available ?? 0;
+  const noCredit =
+    apiErrorCode(create.error) === "ENTITLEMENT_INSUFFICIENT" ||
+    (credits.isSuccess && available === 0);
+
+  const start = () => {
+    if (!picked) return;
+    create.mutate(picked, {
+      onSuccess: (interview) =>
+        navigation.replace("InterviewSession", { id: interview.id }),
+    });
+  };
+
+  return (
+    <Screen
+      title="New interview"
+      subtitle="Pick the role you want to practise. Three rounds, 10 minutes each."
+    >
+      <VStack gap={14}>
+        <VerifyEmailCard />
+        {noCredit ? (
+          <Banner
+            tone="warning"
+            title="No interview credits left"
+            message="Your free trial is used. Paid plans arrive in a later release."
+          />
+        ) : credits.isSuccess ? (
+          <Banner
+            tone="info"
+            message={`You have ${available} interview credit${available === 1 ? "" : "s"}. One is reserved when you start and returned if you cancel before the first round.`}
+          />
+        ) : null}
+        {create.isError && !noCredit ? (
+          <Banner tone="danger" message={apiErrorMessage(create.error)} />
+        ) : null}
+
+        {templates.isLoading ? (
+          <Skeleton height={160} />
+        ) : templates.isError ? (
+          <ErrorState
+            error={templates.error}
+            title="Couldn't load the roles"
+            onRetry={templates.refetch}
+          />
+        ) : (templates.data ?? []).length === 0 ? (
+          <Card>
+            <EmptyState
+              icon={Briefcase}
+              title="No roles published yet"
+              message="An administrator needs to publish an interview template."
+            />
+          </Card>
+        ) : (
+          <Card padded={false}>
+            {(templates.data ?? []).map((t, i) => (
+              <React.Fragment key={t.id}>
+                {i > 0 ? <Divider /> : null}
+                <ListRow
+                  title={t.targetRole}
+                  subtitle={t.description || t.name}
+                  value={picked === t.id ? "Selected" : undefined}
+                  onPress={() => setPicked(t.id)}
+                />
+              </React.Fragment>
+            ))}
+          </Card>
+        )}
+
+        <Button
+          label="Continue"
+          size="lg"
+          disabled={!picked || !verified || noCredit}
+          loading={create.isPending}
+          onPress={start}
+        />
+      </VStack>
+    </Screen>
+  );
+}

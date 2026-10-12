@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "AI Interview",
+    "slug": "ai-interview",
+    "version": "1.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "light",
+    "scheme": "aiinterview",
+    "ios": { "supportsTablet": true },
+    "android": { "softwareKeyboardLayoutMode": "resize" },
+    "web": { "bundler": "metro" },
+    "plugins": [["expo-secure-store", { "faceIDPermission": false }], "expo-font"]
+  }
+}

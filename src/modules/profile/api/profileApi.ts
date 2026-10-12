@@ -1,0 +1,30 @@
+import { apiClient, ApiOne } from "@api/apiClient";
+import { User } from "@shared/store/useAuthStore";
+
+export const EXPERIENCE_LEVELS = ["entry", "junior", "mid", "senior", "lead"] as const;
+export type ExperienceLevel = (typeof EXPERIENCE_LEVELS)[number];
+
+export interface CandidateProfile {
+  targetRoles: string[];
+  experienceLevel: ExperienceLevel;
+  skills: string[];
+}
+
+export interface Me {
+  user: User;
+  candidateProfile: CandidateProfile | null;
+  memberships: { tenantId: string; tenantName: string; role: string }[];
+}
+
+export const profileApi = {
+  me: async () => (await apiClient.get<ApiOne<Me>>("/me")).data.data,
+  updateMe: async (displayName: string) =>
+    (await apiClient.patch<ApiOne<User>>("/me", { displayName })).data.data,
+  updateCandidateProfile: async (profile: CandidateProfile) =>
+    (
+      await apiClient.put<ApiOne<CandidateProfile>>(
+        "/me/candidate-profile",
+        profile,
+      )
+    ).data.data,
+};
