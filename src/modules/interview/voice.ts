@@ -31,7 +31,7 @@ interface RecognitionLike {
       }) => void)
     | null;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((e: { error?: string }) => void) | null;
 }
 
 const isWeb = Platform.OS === "web" && typeof window !== "undefined";
@@ -83,25 +83,30 @@ let generation = 0;
 let stopCurrent: (() => void) | null = null;
 
 /** The device's own voice: the last resort on every platform. */
-function speakWithDevice(text: string, voice: InterviewerVoice) {
+function speakWithDevice(text: string, voice: InterviewerVoice, done: () => void) {
   if (isWeb) {
-    if (!canSpeak()) return;
+    if (!canSpeak()) return done();
     const u = new SpeechSynthesisUtterance(text);
     const v = deviceVoice(voice);
     if (v) u.voice = v;
+    u.onend = done;
+    u.onerror = done;
     window.speechSynthesis.speak(u);
     return;
   }
   // Android and iOS expose no reliable gender for their voices, so the
   // device fallback there is whichever voice the phone is set to.
-  Speech.speak(text, { language: "en-US" });
+  Speech.speak(text, { language: "en-US", onDone: done, onStopped: done, onError: done });
 }
 
-async function playOnWeb(path: string) {
+async function playOnWeb(path: string, done: () => void) {
   const res = await apiClient.get<Blob>(path, { responseType: "blob" });
   const url = URL.createObjectURL(res.data);
   const audio = new Audio(url);
-  audio.onended = () => URL.revokeObjectURL(url);
+  audio.onended = () => {
+    URL.revokeObjectURL(url);
+    done();
+  };
   stopCurrent = () => audio.pause();
   await audio.play();
 }
@@ -112,7 +117,7 @@ async function playOnWeb(path: string) {
  * time" is the failure signal.
  */
 const NATIVE_START_TIMEOUT_MS = 20_000;
-async function playOnNative(path: string) {
+async function playOnNative(path: string, done: () => void) {
   const auth = useAuthStore.getState();
   const token = isTokenExpired(auth.token) ? await auth.refreshSession() : auth.token;
   if (!token) throw new Error("no session");
@@ -134,7 +139,10 @@ async function playOnNative(path: string) {
         clearTimeout(timer);
         resolve();
       }
-      if (status.didJustFinish) release();
+      if (status.didJustFinish) {
+        release();
+        done();
+      }
     });
     player.play();
   }).catch((err) => {
@@ -149,18 +157,38 @@ async function playOnNative(path: string) {
  * decides). If the request fails for any reason - no credits, offline,
  * autoplay blocked - the device's own voice reads it instead: a question must
  * never go unheard because a voice service is down.
+ *
+ * `onDone` fires once when the line has finished (or could not be spoken at
+ * all), and never if it was cut short by `stopSpeaking`. The room uses it to
+ * open the microphone only after the interviewer stops talking, so the mic
+ * does not transcribe the interviewer's own voice from the speakers.
  */
-export function speak(text: string, voice: InterviewerVoice = "female", path?: string) {
+export function speak(
+  text: string,
+  voice: InterviewerVoice = "female",
+  path?: string,
+  onDone?: () => void,
+) {
   stopSpeaking();
   const mine = generation;
-  if (!path) return speakWithDevice(text, voice);
-  (isWeb ? playOnWeb(path) : playOnNative(path)).then(
+  let finished = false;
+  const done = () => {
+    if (finished || mine !== generation) return;
+    finished = true;
+    clearTimeout(safety);
+    onDone?.();
+  };
+  // Some browsers silently refuse to speak (autoplay rules) and never report
+  // an end. Roughly the time the line would take to say, then carry on.
+  const safety = setTimeout(done, Math.min(45_000, 4000 + text.length * 90));
+  if (!path) return speakWithDevice(text, voice, done);
+  (isWeb ? playOnWeb(path, done) : playOnNative(path, done)).then(
     () => {
       // Stopped while loading: silence what has just started.
       if (mine !== generation) stopCurrent?.();
     },
     () => {
-      if (mine === generation) speakWithDevice(text, voice);
+      if (mine === generation) speakWithDevice(text, voice, done);
     },
   );
 }
@@ -174,47 +202,93 @@ export function stopSpeaking() {
   } else void Speech.stop();
 }
 
-/** Dictation into `onFinalText`, one finished phrase at a time. */
-export function useSpeechRecognition(onFinalText: (text: string) => void) {
+export type MicProblem = "blocked" | "unavailable" | null;
+
+/**
+ * Dictation. `onFinalText` receives each finished phrase; `onActivity` fires
+ * on every sound the recogniser hears, finished or not, so the caller can
+ * tell "still talking" from "has stopped".
+ *
+ * While listening is wanted the recogniser is restarted whenever the browser
+ * ends it by itself (Chrome does after a stretch of silence), so a thinking
+ * pause does not turn the microphone off. A refused permission is not
+ * retried - it is reported as `problem` so the screen can say so.
+ */
+export function useSpeechRecognition(
+  onFinalText: (text: string) => void,
+  onActivity?: () => void,
+) {
   const supported = recognitionCtor() !== null;
   const [listening, setListening] = useState(false);
+  const [problem, setProblem] = useState<MicProblem>(null);
   const rec = useRef<RecognitionLike | null>(null);
-  const sink = useRef(onFinalText);
+  const wanted = useRef(false);
+  const sink = useRef({ onFinalText, onActivity });
   useEffect(() => {
-    sink.current = onFinalText;
+    sink.current = { onFinalText, onActivity };
   });
 
   const stop = useCallback(() => {
-    rec.current?.stop();
+    wanted.current = false;
+    const r = rec.current;
     rec.current = null;
+    if (r) {
+      r.onend = null;
+      r.stop();
+    }
     setListening(false);
   }, []);
 
   const start = useCallback(() => {
     const Ctor = recognitionCtor();
     if (!Ctor || rec.current) return;
-    stopSpeaking();
-    const r = new Ctor();
-    r.continuous = true;
-    r.interimResults = false;
-    r.lang = "en-US";
-    r.onresult = (e) => {
-      for (let i = e.resultIndex; i < e.results.length; i++)
-        if (e.results[i].isFinal) sink.current(e.results[i][0].transcript.trim());
+    wanted.current = true;
+    const open = () => {
+      if (!wanted.current) return;
+      const r = new Ctor();
+      r.continuous = true;
+      r.interimResults = true;
+      r.lang = "en-US";
+      r.onresult = (e) => {
+        sink.current.onActivity?.();
+        for (let i = e.resultIndex; i < e.results.length; i++)
+          if (e.results[i].isFinal) {
+            const text = e.results[i][0].transcript.trim();
+            if (text) sink.current.onFinalText(text);
+          }
+      };
+      r.onerror = (e) => {
+        if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+          wanted.current = false;
+          setProblem("blocked");
+        } else if (e.error === "audio-capture") {
+          wanted.current = false;
+          setProblem("unavailable");
+        }
+        // "no-speech", "aborted" and "network" end the session; onend decides whether to reopen.
+      };
+      r.onend = () => {
+        rec.current = null;
+        if (wanted.current) return void setTimeout(open, 250);
+        setListening(false);
+      };
+      rec.current = r;
+      try {
+        r.start();
+        setProblem(null);
+        setListening(true);
+      } catch {
+        rec.current = null;
+        wanted.current = false;
+        setListening(false);
+      }
     };
-    r.onend = () => {
-      rec.current = null;
-      setListening(false);
-    };
-    r.onerror = r.onend;
-    rec.current = r;
-    r.start();
-    setListening(true);
+    open();
   }, []);
 
   useEffect(() => stop, [stop]);
 
-  return { supported, listening, start, stop };
+  return { supported, listening, problem, start, stop };
 }
 
 /**

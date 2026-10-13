@@ -79,6 +79,8 @@ export interface RoomState {
   currentRound: Round | null;
   turns: Turn[];
   warningAtSeconds: number;
+  /** Seconds of silence after which a spoken answer is sent by itself. */
+  silenceSubmitSeconds: number;
   /** Local-clock deadline derived from the server's remaining seconds. */
   deadlineMs: number;
 }

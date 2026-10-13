@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, TextInput, StyleSheet } from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -53,8 +53,27 @@ export default function InterviewRoomScreen() {
 
   const [draft, setDraft] = useState("");
   const [voice, setVoice] = useState<InterviewerVoice>(getVoicePreference);
-  const mic = useSpeechRecognition((text) =>
-    setDraft((d) => (d ? `${d} ${text}` : text)),
+  // Hands-free answering: the mic opens after each question, and a spoken
+  // answer is sent once the candidate has been silent for the threshold.
+  const lastSound = useRef(0);
+  // True once this answer contains dictated words. Typing clears it, so an
+  // answer being edited by hand is never sent out from under the candidate.
+  const dictated = useRef(false);
+  const draftRef = useRef("");
+  const [silentMs, setSilentMs] = useState(0);
+  const mic = useSpeechRecognition(
+    (text) => {
+      dictated.current = true;
+      lastSound.current = Date.now();
+      setDraft((d) => {
+        const next = d ? `${d} ${text}` : text;
+        draftRef.current = next;
+        return next;
+      });
+    },
+    () => {
+      lastSound.current = Date.now();
+    },
   );
   const seconds = useCountdown(live && state ? state.deadlineMs : null);
   // Consent was given before the interview could start; this only checks the
@@ -69,6 +88,7 @@ export default function InterviewRoomScreen() {
       interviewApi.addTurn(id, round!.id, requestId(), text),
     onSuccess: (r) => {
       setDraft("");
+      draftRef.current = "";
       qc.setQueryData<RoomState>(["interview-room", id], (prev) =>
         prev
           ? {
@@ -114,6 +134,35 @@ export default function InterviewRoomScreen() {
     onSuccess: () => reload(),
   });
 
+  const startListening = mic.start;
+  const stopListening = mic.stop;
+  const sendAnswer = answer.mutate;
+  const sending = answer.isPending || finish.isPending;
+  const silenceLimitMs = (state?.silenceSubmitSeconds ?? 5) * 1000;
+
+  /** Sends what is in the box. A second call while one is in flight does nothing. */
+  const submit = useCallback(() => {
+    const text = draftRef.current.trim();
+    if (!text || sending) return;
+    dictated.current = false;
+    setSilentMs(0);
+    stopListening();
+    sendAnswer(text);
+  }, [sending, stopListening, sendAnswer]);
+
+  // The silence clock. It only runs for a dictated answer, restarts on every
+  // sound the recogniser hears, and never sends an empty box.
+  useEffect(() => {
+    if (!live) return;
+    const tick = setInterval(() => {
+      if (!dictated.current || !draftRef.current.trim() || sending) return setSilentMs(0);
+      const idle = Date.now() - lastSound.current;
+      setSilentMs(idle);
+      if (idle >= silenceLimitMs) submit();
+    }, 250);
+    return () => clearInterval(tick);
+  }, [live, sending, silenceLimitMs, submit]);
+
   // Read each new interviewer question aloud, once.
   const lastAi = [...(state?.turns ?? [])].reverse().find((t) => t.speaker === "ai");
   const spoken = useRef<string | null>(null);
@@ -127,9 +176,13 @@ export default function InterviewRoomScreen() {
         state?.interview.voiceEnabled && round
           ? interviewApi.turnSpeechPath(id, round.id, turnId, voice)
           : undefined,
+        // The mic opens when the interviewer stops talking - not before, or it
+        // would transcribe the question from the speakers. Not after the
+        // closing line: there is nothing left to answer.
+        lastAi.kind === "wrap_up" ? undefined : startListening,
       );
     }
-  }, [live, lastAi, voice, id, round, state?.interview.voiceEnabled]);
+  }, [live, lastAi, voice, id, round, state?.interview.voiceEnabled, startListening]);
   useEffect(() => stopSpeaking, []);
 
   // When the local countdown reaches zero, ask the server to close the round.
@@ -307,12 +360,29 @@ export default function InterviewRoomScreen() {
           <Banner tone="danger" message={apiErrorMessage(finish.error)} />
         ) : null}
 
+        {mic.problem ? (
+          <Banner
+            tone="warning"
+            title={mic.problem === "blocked" ? "Microphone access is blocked" : "No microphone was found"}
+            message={
+              mic.problem === "blocked"
+                ? "Allow the microphone for this site in your browser's address bar, then press Speak. You can also type your answer and press Send."
+                : "Connect a microphone and press Speak, or type your answer and press Send."
+            }
+          />
+        ) : null}
+
         {!planDone ? (
           <Card>
             <VStack gap={10}>
               <TextInput
                 value={draft}
-                onChangeText={setDraft}
+                onChangeText={(t) => {
+                  // Typing takes over from dictation: nothing is sent until Send is pressed.
+                  dictated.current = false;
+                  draftRef.current = t;
+                  setDraft(t);
+                }}
                 multiline
                 editable={!busy}
                 placeholder={
@@ -338,7 +408,17 @@ export default function InterviewRoomScreen() {
                         <Mic size={16} color={palette.text.primary} />
                       )
                     }
-                    onPress={mic.listening ? mic.stop : mic.start}
+                    onPress={() => {
+                      if (mic.listening) {
+                        // Stopping by hand also cancels the automatic send: the
+                        // candidate wants to look at the answer first.
+                        dictated.current = false;
+                        mic.stop();
+                      } else {
+                        stopSpeaking();
+                        mic.start();
+                      }
+                    }}
                   />
                 ) : null}
                 <Button
@@ -347,12 +427,16 @@ export default function InterviewRoomScreen() {
                   disabled={!draft.trim() || finish.isPending}
                   loading={answer.isPending}
                   icon={<Send size={16} color="#FFFFFF" />}
-                  onPress={() => {
-                    mic.stop();
-                    answer.mutate(draft.trim());
-                  }}
+                  onPress={submit}
                 />
               </HStack>
+              {mic.listening ? (
+                <Text variant="caption" tone="tertiary">
+                  {silentMs >= 1500
+                    ? `Sending your answer in ${Math.max(1, Math.ceil((silenceLimitMs - silentMs) / 1000))}s. Keep talking to continue.`
+                    : `Listening. Your answer is sent after ${Math.round(silenceLimitMs / 1000)} seconds of silence.`}
+                </Text>
+              ) : null}
             </VStack>
           </Card>
         ) : null}
