@@ -22,6 +22,8 @@ import {
   ErrorState,
   EmptyState,
   VStack,
+  Text,
+  TextField,
 } from "@shared/ui";
 
 type Nav = NativeStackNavigationProp<InterviewsStackParamList>;
@@ -42,9 +44,13 @@ export default function NewInterviewScreen() {
     (apiErrorCode(create.error) === "ENTITLEMENT_INSUFFICIENT" ||
       (credits.isSuccess && available === 0));
 
+  // Asked afresh for every interview: people practise for different jobs.
+  const [profession, setProfession] = useState("");
+  const professionOk = profession.trim().length >= 2;
+
   const start = () => {
-    if (!picked) return;
-    create.mutate(picked, {
+    if (!picked || !professionOk) return;
+    create.mutate({ templateId: picked, targetRole: profession.trim() }, {
       onSuccess: (interview) =>
         navigation.replace("InterviewSession", { id: interview.id }),
     });
@@ -53,7 +59,7 @@ export default function NewInterviewScreen() {
   return (
     <Screen
       title="New interview"
-      subtitle="Pick the role you want to practise. Three rounds, 10 minutes each."
+      subtitle="Tell us your profession, then pick the closest interview. Three rounds, 10 minutes each."
     >
       <VStack gap={14}>
         <VerifyEmailCard />
@@ -74,6 +80,21 @@ export default function NewInterviewScreen() {
         {create.isError && !noCredit ? (
           <Banner tone="danger" message={apiErrorMessage(create.error)} />
         ) : null}
+
+        <Card>
+          <TextField
+            label="What is your profession?"
+            value={profession}
+            onChangeText={setProfession}
+            placeholder="For example: Project Manager, Nurse, Sales Executive, Java Developer"
+            hint="The interviewer asks questions for this role."
+            autoCapitalize="words"
+            maxLength={80}
+          />
+        </Card>
+        <Text variant="label" tone="secondary">
+          Pick the closest interview
+        </Text>
 
         {templates.isLoading ? (
           <Skeleton height={160} />
@@ -100,7 +121,11 @@ export default function NewInterviewScreen() {
                   title={t.targetRole}
                   subtitle={t.description || t.name}
                   value={picked === t.id ? "Selected" : undefined}
-                  onPress={() => setPicked(t.id)}
+                  onPress={() => {
+                    setPicked(t.id);
+                    // Saves typing when the listed role is the one they want.
+                    if (!profession.trim()) setProfession(t.targetRole);
+                  }}
                 />
               </React.Fragment>
             ))}
@@ -110,7 +135,7 @@ export default function NewInterviewScreen() {
         <Button
           label="Continue"
           size="lg"
-          disabled={!picked || !verified || noCredit}
+          disabled={!picked || !professionOk || !verified || noCredit}
           loading={create.isPending}
           onPress={start}
         />

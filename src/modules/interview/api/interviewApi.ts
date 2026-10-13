@@ -24,8 +24,8 @@ export const interviewApi = {
     (await apiClient.get<Paginated<Interview>>("/interviews", { params })).data,
   get: (id: string) =>
     one(apiClient.get<ApiOne<Interview>>(`/interviews/${id}`)),
-  create: (templateId: string) =>
-    one(apiClient.post<ApiOne<Interview>>("/interviews", { templateId })),
+  create: ({ templateId, targetRole }: { templateId: string; targetRole: string }) =>
+    one(apiClient.post<ApiOne<Interview>>("/interviews", { templateId, targetRole })),
   consent: (id: string, accepted: boolean, consentVersion: string) =>
     one(
       apiClient.post<ApiOne<Interview>>(`/interviews/${id}/consent`, {
