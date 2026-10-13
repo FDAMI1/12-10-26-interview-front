@@ -69,6 +69,20 @@ export default function AdminOverviewScreen() {
       <SectionHeader title="Manage" />
       <Card padded={false}>
         <ListRow
+          title="Candidates"
+          subtitle="Create, set interview limits, reset passwords, deactivate, delete"
+          chevron
+          onPress={() => navigation.navigate("AdminCandidates")}
+        />
+        <Divider />
+        <ListRow
+          title="Gemini usage"
+          subtitle="Today's requests against the daily quota, and the trend"
+          chevron
+          onPress={() => navigation.navigate("AdminUsage")}
+        />
+        <Divider />
+        <ListRow
           title="Users"
           subtitle="Search, suspend and reactivate accounts"
           chevron

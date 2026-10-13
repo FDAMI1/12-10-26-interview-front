@@ -35,9 +35,12 @@ export default function NewInterviewScreen() {
   const [picked, setPicked] = useState<string | null>(null);
 
   const available = credits.data?.available ?? 0;
+  // Platform admins are not metered.
+  const unlimited = useAuthStore((s) => s.user?.role === "platform_admin");
   const noCredit =
-    apiErrorCode(create.error) === "ENTITLEMENT_INSUFFICIENT" ||
-    (credits.isSuccess && available === 0);
+    !unlimited &&
+    (apiErrorCode(create.error) === "ENTITLEMENT_INSUFFICIENT" ||
+      (credits.isSuccess && available === 0));
 
   const start = () => {
     if (!picked) return;
@@ -60,6 +63,8 @@ export default function NewInterviewScreen() {
             title="No interview credits left"
             message="Your free trial is used. Paid plans arrive in a later release."
           />
+        ) : unlimited ? (
+          <Banner tone="info" message="As a platform admin you can start any number of interviews. No credit is used." />
         ) : credits.isSuccess ? (
           <Banner
             tone="info"

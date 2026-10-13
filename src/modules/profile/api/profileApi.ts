@@ -17,6 +17,13 @@ export interface Me {
 }
 
 export const profileApi = {
+  /** Who a token belongs to, before it is stored (API-integration launch links). */
+  meWithToken: async (token: string) =>
+    (
+      await apiClient.get<ApiOne<Me>>("/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    ).data.data.user,
   me: async () => (await apiClient.get<ApiOne<Me>>("/me")).data.data,
   updateMe: async (displayName: string) =>
     (await apiClient.patch<ApiOne<User>>("/me", { displayName })).data.data,

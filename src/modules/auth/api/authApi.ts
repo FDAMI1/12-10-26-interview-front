@@ -24,6 +24,14 @@ export const authApi = {
     (await apiClient.post<Message>("/auth/verify-email/resend")).data.data,
   forgotPassword: async (payload: { email: string }) =>
     (await apiClient.post<Message>("/auth/password/forgot", payload)).data.data,
+  /** Replaces the current password; also how a temporary one is exchanged. */
+  changePassword: async (currentPassword: string, newPassword: string) =>
+    (
+      await apiClient.post<{ data: { user: User } }>("/auth/password/change", {
+        currentPassword,
+        newPassword,
+      })
+    ).data.data.user,
   resetPassword: async (payload: {
     email: string;
     code: string;

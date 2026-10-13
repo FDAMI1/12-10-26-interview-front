@@ -19,6 +19,10 @@ export interface User {
   role: PlatformRole;
   status: "active" | "suspended";
   emailVerified: boolean;
+  /** "api" candidates arrive through a company integration and have no password here. */
+  authType: "password" | "api";
+  /** Signed in with an admin-issued temporary password; must choose their own first. */
+  mustChangePassword: boolean;
   locale: string;
   timezone: string;
 }

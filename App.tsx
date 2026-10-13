@@ -70,6 +70,8 @@ const linking = {
               AdminOverview: "",
               AdminUsers: "users",
               AdminSettings: "settings",
+              AdminCandidates: "candidates",
+              AdminUsage: "usage",
             },
           },
         },

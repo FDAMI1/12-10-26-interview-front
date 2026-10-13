@@ -26,6 +26,8 @@ const LABELS: Record<string, string> = {
   "interview.turnGraceSeconds": "Grace for an answer in flight (seconds)",
   "consent.currentVersion": "Current consent version",
   "retention.recordingDays": "Recording and transcript retention (days)",
+  "ai.geminiDailyTextRequestQuota": "Gemini daily quota: question and scoring requests",
+  "ai.geminiDailyVoiceRequestQuota": "Gemini daily quota: voice requests",
 };
 
 const BOOL_OPTIONS = [
