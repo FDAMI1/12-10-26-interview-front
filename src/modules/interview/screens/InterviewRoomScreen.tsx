@@ -125,7 +125,7 @@ export default function InterviewRoomScreen() {
         lastAi.text,
         voice,
         state?.interview.voiceEnabled && round
-          ? () => interviewApi.turnSpeech(id, round.id, turnId, voice)
+          ? interviewApi.turnSpeechPath(id, round.id, turnId, voice)
           : undefined,
       );
     }
@@ -213,7 +213,10 @@ export default function InterviewRoomScreen() {
   const tone =
     remaining <= 30 ? "danger" : remaining <= state.warningAtSeconds ? "warning" : null;
   const busy = answer.isPending || finish.isPending;
-  const planDone = round.questionsAsked >= round.questionCount && lastAi !== state.turns.at(-1);
+  // The interviewer has closed the round, or (older rounds) has nothing left to ask.
+  const planDone =
+    round.questionsAsked >= round.questionCount &&
+    (lastAi?.kind === "wrap_up" || lastAi !== state.turns.at(-1));
 
   return (
     <Screen
@@ -256,6 +259,7 @@ export default function InterviewRoomScreen() {
         </HStack>
 
         <VoicePicker
+          sampleFromServer={interview.voiceEnabled}
           value={voice}
           onChange={(v) => {
             setVoicePreference(v);

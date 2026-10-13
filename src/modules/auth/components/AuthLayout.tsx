@@ -11,7 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Mic, Timer, FileText } from "lucide-react-native";
 import { palette, gradients, radius, layout } from "@shared/designSystem";
-import { Text, VStack, HStack } from "@shared/ui";
+import { Text, VStack, HStack, LegalLinks } from "@shared/ui";
 
 interface Props {
   title: string;
@@ -93,6 +93,9 @@ export function AuthLayout({ title, subtitle, children }: Props) {
                   </Text>
                 </VStack>
                 {children}
+                <View style={{ marginTop: 28 }}>
+                  <LegalLinks />
+                </View>
               </View>
             </ScrollView>
           </KeyboardAvoidingView>

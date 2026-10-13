@@ -81,14 +81,10 @@ export const interviewApi = {
     one(
       apiClient.get<ApiOne<Turn[]>>(`/interviews/${id}/rounds/${roundId}/turns`),
     ),
-  /** The interviewer's line as MP3, in the chosen voice. */
-  turnSpeech: async (id: string, roundId: string, turnId: string, voice: "female" | "male") =>
-    (
-      await apiClient.get<Blob>(
-        `/interviews/${id}/rounds/${roundId}/turns/${turnId}/speech`,
-        { params: { voice }, responseType: "blob" },
-      )
-    ).data,
+  /** API route that returns an interviewer line as audio in the chosen voice. */
+  turnSpeechPath: (id: string, roundId: string, turnId: string, voice: "female" | "male") =>
+    `/interviews/${id}/rounds/${roundId}/turns/${turnId}/speech?voice=${voice}`,
+  voiceSamplePath: (voice: "female" | "male") => `/interviews/voice-sample?voice=${voice}`,
   recordingUploadTicket: (id: string, roundId: string) =>
     one(
       apiClient.post<ApiOne<UploadTicket>>(

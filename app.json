@@ -6,9 +6,74 @@
     "orientation": "default",
     "userInterfaceStyle": "light",
     "scheme": "aiinterview",
-    "ios": { "supportsTablet": true },
-    "android": { "softwareKeyboardLayoutMode": "resize" },
-    "web": { "bundler": "metro" },
-    "plugins": [["expo-secure-store", { "faceIDPermission": false }], "expo-font"]
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.aiinterviewpractice.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.aiinterviewpractice.app",
+      "softwareKeyboardLayoutMode": "resize",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0C7942"
+      },
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png",
+      "name": "AI Interview",
+      "shortName": "AI Interview",
+      "themeColor": "#0C7942",
+      "backgroundColor": "#F6F8F8"
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF"
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
+      "expo-font",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-asset"
+    ],
+    "description": "Practise HR, technical and managerial interview rounds with an AI interviewer and get a scored report.",
+    "icon": "./assets/icon.png",
+    "owner": "interview21s-team",
+    "extra": {
+      "eas": {
+        "projectId": "75f1b865-36c6-44ce-b71a-51d90271cbbc"
+      }
+    }
   }
 }

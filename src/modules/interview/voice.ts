@@ -1,8 +1,9 @@
 /**
- * Voice on the web. The interviewer speaks in an ElevenLabs voice (male or
- * female, the candidate's choice) when the server has a key, and in the
- * browser's own SpeechSynthesis voice otherwise. SpeechRecognition turns the
- * spoken answer into text.
+ * The interviewer's voice, male or female as the candidate chooses. The
+ * server speaks each line (ElevenLabs, or Gemini when that is unavailable)
+ * and the device's own voice takes over if the server cannot. On the web,
+ * SpeechRecognition also turns the spoken answer into text; native answers
+ * are typed.
  *
  * ponytail: browser speech only. Native builds fall back to typed answers and
  * silent questions; phase 3 replaces this with the OpenAI Realtime WebRTC
@@ -10,6 +11,11 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
+import { createAudioPlayer } from "expo-audio";
+import * as Speech from "expo-speech";
+import { apiClient } from "@api/apiClient";
+import { environment } from "@config/env";
+import { useAuthStore, isTokenExpired } from "@shared/store/useAuthStore";
 import { DeviceCheckResult } from "@modules/interview/types";
 
 interface RecognitionLike {
@@ -43,7 +49,11 @@ export type InterviewerVoice = "female" | "male";
 const VOICE_KEY = "interviewer-voice";
 
 /** The candidate's chosen interviewer voice; remembered on this device. */
+// Native keeps the choice for the session; web also remembers it on the device.
+let chosen: InterviewerVoice | null = null;
+
 export function getVoicePreference(): InterviewerVoice {
+  if (chosen) return chosen;
   try {
     if (isWeb && window.localStorage.getItem(VOICE_KEY) === "male") return "male";
   } catch {
@@ -53,6 +63,7 @@ export function getVoicePreference(): InterviewerVoice {
 }
 
 export function setVoicePreference(voice: InterviewerVoice) {
+  chosen = voice;
   try {
     if (isWeb) window.localStorage.setItem(VOICE_KEY, voice);
   } catch {
@@ -67,53 +78,100 @@ function deviceVoice(voice: InterviewerVoice) {
   return english.find((v) => want.test(v.name)) ?? null;
 }
 
-let playing: HTMLAudioElement | null = null;
 // Bumped by every speak/stop, so audio that arrives late never plays.
 let generation = 0;
+let stopCurrent: (() => void) | null = null;
 
+/** The device's own voice: the last resort on every platform. */
 function speakWithDevice(text: string, voice: InterviewerVoice) {
-  if (!canSpeak()) return;
-  const u = new SpeechSynthesisUtterance(text);
-  const v = deviceVoice(voice);
-  if (v) u.voice = v;
-  window.speechSynthesis.speak(u);
+  if (isWeb) {
+    if (!canSpeak()) return;
+    const u = new SpeechSynthesisUtterance(text);
+    const v = deviceVoice(voice);
+    if (v) u.voice = v;
+    window.speechSynthesis.speak(u);
+    return;
+  }
+  // Android and iOS expose no reliable gender for their voices, so the
+  // device fallback there is whichever voice the phone is set to.
+  Speech.speak(text, { language: "en-US" });
+}
+
+async function playOnWeb(path: string) {
+  const res = await apiClient.get<Blob>(path, { responseType: "blob" });
+  const url = URL.createObjectURL(res.data);
+  const audio = new Audio(url);
+  audio.onended = () => URL.revokeObjectURL(url);
+  stopCurrent = () => audio.pause();
+  await audio.play();
 }
 
 /**
- * Reads an interviewer line aloud. With `fetchAudio` it plays the server's
- * studio voice and falls back to the device voice if that fails for any
- * reason (no credits left, offline, autoplay blocked) - a question must never
- * go unheard because a voice service is down.
- *
- * ponytail: web only. Native builds stay silent until an audio player
- * (expo-audio) is added.
+ * Native streams straight from the API with the session token. The player
+ * reports nothing useful on a failed request, so "did not start playing in
+ * time" is the failure signal.
  */
-export function speak(text: string, voice: InterviewerVoice = "female", fetchAudio?: () => Promise<Blob>) {
+const NATIVE_START_TIMEOUT_MS = 20_000;
+async function playOnNative(path: string) {
+  const auth = useAuthStore.getState();
+  const token = isTokenExpired(auth.token) ? await auth.refreshSession() : auth.token;
+  if (!token) throw new Error("no session");
+  const player = createAudioPlayer({
+    uri: environment.apiUrl + path,
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    player.remove();
+  };
+  stopCurrent = release;
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("audio did not start")), NATIVE_START_TIMEOUT_MS);
+    player.addListener("playbackStatusUpdate", (status) => {
+      if (status.playing) {
+        clearTimeout(timer);
+        resolve();
+      }
+      if (status.didJustFinish) release();
+    });
+    player.play();
+  }).catch((err) => {
+    release();
+    throw err;
+  });
+}
+
+/**
+ * Reads an interviewer line aloud. `path` is the API route that returns the
+ * line as audio (ElevenLabs, or Gemini when that is unavailable - the server
+ * decides). If the request fails for any reason - no credits, offline,
+ * autoplay blocked - the device's own voice reads it instead: a question must
+ * never go unheard because a voice service is down.
+ */
+export function speak(text: string, voice: InterviewerVoice = "female", path?: string) {
   stopSpeaking();
   const mine = generation;
-  if (!isWeb) return;
-  if (!fetchAudio) return speakWithDevice(text, voice);
-  fetchAudio()
-    .then(async (blob) => {
-      if (mine !== generation) return;
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audio.onended = () => URL.revokeObjectURL(url);
-      playing = audio;
-      await audio.play();
-    })
-    .catch(() => {
+  if (!path) return speakWithDevice(text, voice);
+  (isWeb ? playOnWeb(path) : playOnNative(path)).then(
+    () => {
+      // Stopped while loading: silence what has just started.
+      if (mine !== generation) stopCurrent?.();
+    },
+    () => {
       if (mine === generation) speakWithDevice(text, voice);
-    });
+    },
+  );
 }
 
 export function stopSpeaking() {
   generation++;
-  if (playing) {
-    playing.pause();
-    playing = null;
-  }
-  if (canSpeak()) window.speechSynthesis.cancel();
+  stopCurrent?.();
+  stopCurrent = null;
+  if (isWeb) {
+    if (canSpeak()) window.speechSynthesis.cancel();
+  } else void Speech.stop();
 }
 
 /** Dictation into `onFinalText`, one finished phrase at a time. */

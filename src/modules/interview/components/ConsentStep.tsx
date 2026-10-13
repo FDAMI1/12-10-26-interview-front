@@ -7,10 +7,12 @@ const points = (recordsAudio: boolean) => [
   recordsAudio
     ? "What we keep: an audio recording of your microphone for each round, and a written transcript of the questions and your answers. Only your side is recorded; there is no video."
     : "What we keep: a written transcript of the questions and your answers. Audio is not recorded on this device.",
-  "Why: to score your answers with AI, give you written feedback, and let you review the session later.",
-  "Who can see it: you. If a company invited you to this interview, its authorised reviewers can see and hear it too.",
-  "How long: recordings and transcripts are kept for 90 days unless you ask for deletion sooner.",
-  "Your choice: you can decline now and your interview credit is returned. To delete a session later, contact the platform administrator.",
+  "Why: to score your answers with AI, give you written feedback, and let you review the session later. Your answers are sent to our AI provider (Google Gemini) for this.",
+  recordsAudio
+    ? "Who can see it: you. If a company invited you to this interview, its authorised reviewers can see and hear it too."
+    : "Who can see it: you. If a company invited you to this interview, its authorised reviewers can read it too.",
+  "How long: until you delete your account. Deleting it removes every interview straight away.",
+  "Your choice: you can decline now and your interview credit is returned. You can delete your account and all its data at any time from your profile.",
 ];
 
 interface Props {

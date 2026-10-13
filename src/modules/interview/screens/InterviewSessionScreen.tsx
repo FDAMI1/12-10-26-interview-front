@@ -109,6 +109,7 @@ export default function InterviewSessionScreen() {
                 a quiet place first.
               </Text>
               <VoicePicker
+                sampleFromServer={interview.voiceEnabled}
                 value={voice}
                 onChange={(v) => {
                   setVoicePreference(v);

@@ -1,6 +1,6 @@
 import React from "react";
-import { Platform } from "react-native";
-import { InterviewerVoice } from "@modules/interview/voice";
+import { interviewApi } from "@modules/interview/api/interviewApi";
+import { InterviewerVoice, speak } from "@modules/interview/voice";
 import { ChipsRow, Text, VStack } from "@shared/ui";
 
 const CHIPS = [
@@ -11,11 +11,14 @@ const CHIPS = [
 interface Props {
   value: InterviewerVoice;
   onChange: (voice: InterviewerVoice) => void;
+  /** The server can speak (see Interview.voiceEnabled); otherwise the device voice samples. */
+  sampleFromServer: boolean;
 }
 
-/** Who reads the questions aloud. Hidden on native, where nothing is spoken yet. */
-export function VoicePicker({ value, onChange }: Props) {
-  if (Platform.OS !== "web") return null;
+const SAMPLE = "Hello, I will be your interviewer today. Take your time with each answer.";
+
+/** Who reads the questions aloud. Choosing a voice plays a short sample of it. */
+export function VoicePicker({ value, onChange, sampleFromServer }: Props) {
   return (
     <VStack gap={4}>
       <Text variant="label" tone="secondary">
@@ -24,7 +27,12 @@ export function VoicePicker({ value, onChange }: Props) {
       <ChipsRow
         chips={CHIPS}
         active={value}
-        onChange={(k) => onChange(k as InterviewerVoice)}
+        onChange={(k) => {
+          const voice = k as InterviewerVoice;
+          onChange(voice);
+          // Let them hear what they picked.
+          speak(SAMPLE, voice, sampleFromServer ? interviewApi.voiceSamplePath(voice) : undefined);
+        }}
       />
     </VStack>
   );

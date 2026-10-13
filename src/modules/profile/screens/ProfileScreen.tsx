@@ -7,6 +7,7 @@ import {
   profileApi,
   EXPERIENCE_LEVELS,
 } from "@modules/profile/api/profileApi";
+import { DeleteAccountCard } from "@modules/profile/components/DeleteAccountCard";
 import { VerifyEmailCard } from "@modules/auth/components/VerifyEmailCard";
 import { apiErrorMessage } from "@api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
@@ -22,6 +23,7 @@ import {
   Select,
   Skeleton,
   ErrorState,
+  LegalLinks,
 } from "@shared/ui";
 
 const schema = z.object({
@@ -140,6 +142,8 @@ export default function ProfileScreen() {
             fullWidth={false}
             onPress={() => void logout()}
           />
+          {me.data?.user.role === "platform_admin" ? null : <DeleteAccountCard />}
+          <LegalLinks />
         </VStack>
       )}
     </Screen>

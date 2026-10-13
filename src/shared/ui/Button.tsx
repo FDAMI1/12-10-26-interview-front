@@ -104,7 +104,7 @@ export function Button({
   const lastPress = useRef(0);
   const pressOnce = () => {
     const now = Date.now();
-    if (now - lastPress.current < 500) return;
+    if (now - lastPress.current < 400) return;
     lastPress.current = now;
     onPress?.();
   };

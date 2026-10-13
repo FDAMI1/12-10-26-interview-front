@@ -9,7 +9,7 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
 export const apiClient = axios.create({
   baseURL: environment.apiUrl,
   headers: { "Content-Type": "application/json" },
-  timeout: 30_000,
+  timeout: 60_000,
 });
 
 apiClient.interceptors.request.use((config) => {

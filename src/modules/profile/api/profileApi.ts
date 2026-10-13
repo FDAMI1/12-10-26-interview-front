@@ -20,6 +20,9 @@ export const profileApi = {
   me: async () => (await apiClient.get<ApiOne<Me>>("/me")).data.data,
   updateMe: async (displayName: string) =>
     (await apiClient.patch<ApiOne<User>>("/me", { displayName })).data.data,
+  /** Permanently deletes the signed-in account and its data. */
+  deleteAccount: async (password: string) =>
+    (await apiClient.delete<ApiOne<{ message: string }>>("/me", { data: { password } })).data.data,
   updateCandidateProfile: async (profile: CandidateProfile) =>
     (
       await apiClient.put<ApiOne<CandidateProfile>>(

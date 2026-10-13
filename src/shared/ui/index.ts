@@ -14,6 +14,7 @@ export { ConfirmDialog } from "./ConfirmDialog";
 export { Skeleton } from "./Skeleton";
 export { BackLink } from "./BackLink";
 export { Screen } from "./Screen";
+export { LegalLinks } from "./LegalLinks";
 export { EmptyState } from "./EmptyState";
 export { ErrorState } from "./ErrorState";
 export { useBottomPadding, useTabBottomPadding } from "./useBottomPadding";
