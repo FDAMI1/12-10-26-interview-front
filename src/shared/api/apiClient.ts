@@ -13,6 +13,8 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
+  // Read every time: the phone app can be pointed at another server at run time.
+  config.baseURL = environment.apiUrl;
   const token = useAuthStore.getState().token;
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;

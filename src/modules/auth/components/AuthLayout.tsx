@@ -12,6 +12,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Mic, Timer, FileText } from "lucide-react-native";
 import { palette, gradients, radius, layout } from "@shared/designSystem";
 import { Text, VStack, HStack, LegalLinks } from "@shared/ui";
+import { ServerAddress } from "@modules/auth/components/ServerAddress";
 
 interface Props {
   title: string;
@@ -93,8 +94,9 @@ export function AuthLayout({ title, subtitle, children }: Props) {
                   </Text>
                 </VStack>
                 {children}
-                <View style={{ marginTop: 28 }}>
+                <View style={{ marginTop: 28, gap: 14 }}>
                   <LegalLinks />
+                  <ServerAddress />
                 </View>
               </View>
             </ScrollView>

@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { loadServerOverride } from "@config/env";
 import { Platform, View } from "react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NavigationContainer } from "@react-navigation/native";
@@ -92,7 +93,13 @@ export default function App() {
       document.title = APP_TITLE;
   }, []);
 
-  if (!fontsLoaded) {
+  // The server address must be known before the first request.
+  const [serverReady, setServerReady] = useState(false);
+  useEffect(() => {
+    void loadServerOverride().finally(() => setServerReady(true));
+  }, []);
+
+  if (!fontsLoaded || !serverReady) {
     return (
       <View style={{ flex: 1, backgroundColor: palette.surface.secondary }} />
     );
