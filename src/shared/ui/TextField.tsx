@@ -76,6 +76,8 @@ export function TextField({
       >
         {leading && <View style={{ marginRight: 10 }}>{leading}</View>}
         <TextInput
+          // The visible label names the field for screen readers too.
+          accessibilityLabel={label}
           {...inputProps}
           secureTextEntry={isPassword && !revealed}
           placeholderTextColor={palette.text.tertiary}

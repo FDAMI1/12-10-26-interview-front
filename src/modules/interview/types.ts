@@ -41,6 +41,9 @@ export interface Interview {
   tenantId: string | null;
   templateName: string;
   targetRole: string;
+  setupMode: SetupMode;
+  /** Title of the resume or question set the interview was prepared from. */
+  preparationTitle: string;
   consentRequired: boolean;
   currentRoundSequence: number;
   startedAt: string | null;
@@ -81,6 +84,8 @@ export interface RoomState {
   warningAtSeconds: number;
   /** Seconds of silence after which a spoken answer is sent by itself. */
   silenceSubmitSeconds: number;
+  /** Check a spoken answer while it is given, and interrupt it if it leaves the question. */
+  realtimeRelevance?: boolean;
   /** Local-clock deadline derived from the server's remaining seconds. */
   deadlineMs: number;
 }
@@ -118,7 +123,30 @@ export interface ScoredDimension {
   evidence: string;
 }
 
+export type Relevance =
+  | "relevant"
+  | "partially_relevant"
+  | "irrelevant"
+  | "unclear"
+  | "incomplete"
+  | "";
+
+export interface QuestionOutcome {
+  questionId: string;
+  question: string;
+  relevance: Relevance;
+  redirections: number;
+  retried: boolean;
+  finalStatus:
+    | "answered"
+    | "partially_answered"
+    | "unanswered"
+    | "no_answer"
+    | "not_assessed";
+}
+
 export interface RoundReport extends Round {
+  questions: QuestionOutcome[];
   dimensions: ScoredDimension[];
   strengths: string[];
   improvements: string[];
@@ -140,6 +168,52 @@ export interface DeviceCheckResult {
 
 export interface Entitlements {
   available: number;
+}
+
+export type SetupMode = "standard" | "resume" | "mcq";
+
+export const SETUP_LABEL: Record<SetupMode, string> = {
+  standard: "Standard interview",
+  resume: "Resume-based interview",
+  mcq: "MCQ-based preparation",
+};
+
+export interface McqQuestion {
+  text: string;
+  options: string[];
+  /** The option the candidate marks as correct. */
+  correctIndex: number;
+}
+
+export interface Preparation {
+  id: string;
+  kind: "resume" | "mcq";
+  title: string;
+  targetRole: string;
+  resume: {
+    fileName: string;
+    format: string;
+    sizeBytes: number;
+    summary: string;
+    skills: string[];
+    experience: string[];
+    education: string[];
+    projects: string[];
+    extractedBy: "ai" | "heuristic";
+  } | null;
+  questions: McqQuestion[];
+  updatedAt: string;
+}
+
+export interface SetupConfig {
+  resumeEnabled: boolean;
+  mcqEnabled: boolean;
+  resumeMaxBytes: number;
+  resumeFormats: string[];
+  mcqMaxQuestions: number;
+  durationSeconds: number;
+  /** "single": one interview on one round; "per_round": that long for each chosen round. */
+  roundMode: "single" | "per_round";
 }
 
 export const ROUND_LABEL: Record<RoundType, string> = {

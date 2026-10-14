@@ -11,6 +11,8 @@ import {
   Turn,
   Round,
   UploadTicket,
+  SetupMode,
+  RoundType,
 } from "@modules/interview/types";
 
 const one = async <T>(p: Promise<{ data: ApiOne<T> }>) => (await p).data.data;
@@ -24,8 +26,13 @@ export const interviewApi = {
     (await apiClient.get<Paginated<Interview>>("/interviews", { params })).data,
   get: (id: string) =>
     one(apiClient.get<ApiOne<Interview>>(`/interviews/${id}`)),
-  create: ({ templateId, targetRole }: { templateId: string; targetRole: string }) =>
-    one(apiClient.post<ApiOne<Interview>>("/interviews", { templateId, targetRole })),
+  create: (body: {
+    templateId: string;
+    targetRole: string;
+    setupMode?: SetupMode;
+    preparationId?: string;
+    roundTypes?: RoundType[];
+  }) => one(apiClient.post<ApiOne<Interview>>("/interviews", body)),
   consent: (id: string, accepted: boolean, consentVersion: string) =>
     one(
       apiClient.post<ApiOne<Interview>>(`/interviews/${id}/consent`, {
@@ -58,13 +65,31 @@ export const interviewApi = {
         Date.now() + (data.currentRound?.remainingSeconds ?? 0) * 1000,
     };
   },
-  addTurn: (id: string, roundId: string, clientRequestId: string, text: string) =>
+  addTurn: (
+    id: string,
+    roundId: string,
+    clientRequestId: string,
+    text: string,
+    interrupted = false,
+  ) =>
     one(
       apiClient.post<ApiOne<TurnResult>>(
         `/interviews/${id}/rounds/${roundId}/turns`,
-        { clientRequestId, text },
+        { clientRequestId, text, ...(interrupted ? { interrupted } : {}) },
       ),
     ),
+  /** Whether a spoken answer still in progress has left the question. */
+  relevanceCheck: async (id: string, roundId: string, text: string) =>
+    (
+      await one(
+        apiClient.post<ApiOne<{ interrupt: boolean }>>(
+          `/interviews/${id}/rounds/${roundId}/relevance-check`,
+          { text },
+          // A late verdict is worthless: the candidate has kept talking.
+          { timeout: 8000 },
+        ),
+      )
+    ).interrupt,
   completeRound: (
     id: string,
     roundId: string,
@@ -79,12 +104,20 @@ export const interviewApi = {
     ),
   turns: (id: string, roundId: string) =>
     one(
-      apiClient.get<ApiOne<Turn[]>>(`/interviews/${id}/rounds/${roundId}/turns`),
+      apiClient.get<ApiOne<Turn[]>>(
+        `/interviews/${id}/rounds/${roundId}/turns`,
+      ),
     ),
   /** API route that returns an interviewer line as audio in the chosen voice. */
-  turnSpeechPath: (id: string, roundId: string, turnId: string, voice: "female" | "male") =>
+  turnSpeechPath: (
+    id: string,
+    roundId: string,
+    turnId: string,
+    voice: "female" | "male",
+  ) =>
     `/interviews/${id}/rounds/${roundId}/turns/${turnId}/speech?voice=${voice}`,
-  voiceSamplePath: (voice: "female" | "male") => `/interviews/voice-sample?voice=${voice}`,
+  voiceSamplePath: (voice: "female" | "male") =>
+    `/interviews/voice-sample?voice=${voice}`,
   recordingUploadTicket: (id: string, roundId: string) =>
     one(
       apiClient.post<ApiOne<UploadTicket>>(

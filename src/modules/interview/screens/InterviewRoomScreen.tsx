@@ -8,6 +8,7 @@ import { VoicePicker } from "@modules/interview/components/VoicePicker";
 import { interviewApi } from "@modules/interview/api/interviewApi";
 import { useRoom } from "@modules/interview/hooks/useInterviews";
 import { useCountdown } from "@modules/interview/hooks/useCountdown";
+import { useRelevanceMonitor } from "@modules/interview/hooks/useRelevanceMonitor";
 import {
   speak,
   stopSpeaking,
@@ -84,8 +85,8 @@ export default function InterviewRoomScreen() {
   const reload = () => qc.invalidateQueries({ queryKey: ["interview-room", id] });
 
   const answer = useMutation({
-    mutationFn: (text: string) =>
-      interviewApi.addTurn(id, round!.id, requestId(), text),
+    mutationFn: ({ text, interrupted }: { text: string; interrupted?: boolean }) =>
+      interviewApi.addTurn(id, round!.id, requestId(), text, interrupted),
     onSuccess: (r) => {
       setDraft("");
       draftRef.current = "";
@@ -141,14 +142,26 @@ export default function InterviewRoomScreen() {
   const silenceLimitMs = (state?.silenceSubmitSeconds ?? 5) * 1000;
 
   /** Sends what is in the box. A second call while one is in flight does nothing. */
-  const submit = useCallback(() => {
-    const text = draftRef.current.trim();
-    if (!text || sending) return;
-    dictated.current = false;
-    setSilentMs(0);
-    stopListening();
-    sendAnswer(text);
-  }, [sending, stopListening, sendAnswer]);
+  const submit = useCallback(
+    (interrupted = false) => {
+      const text = draftRef.current.trim();
+      if (!text || sending) return;
+      dictated.current = false;
+      setSilentMs(0);
+      stopListening();
+      sendAnswer({ text, interrupted });
+    },
+    [sending, stopListening, sendAnswer],
+  );
+
+  // An answer that has clearly left the question is cut short: the mic stops,
+  // what was said so far is sent, and the interviewer speaks the redirect.
+  useRelevanceMonitor({
+    enabled: live && !!state?.realtimeRelevance && mic.listening && !sending,
+    draftRef,
+    check: (text) => interviewApi.relevanceCheck(id, round!.id, text),
+    onOffTopic: () => submit(true),
+  });
 
   // The silence clock. It only runs for a dictated answer, restarts on every
   // sound the recogniser hears, and never sends an empty box.
@@ -427,7 +440,7 @@ export default function InterviewRoomScreen() {
                   disabled={!draft.trim() || finish.isPending}
                   loading={answer.isPending}
                   icon={<Send size={16} color="#FFFFFF" />}
-                  onPress={submit}
+                  onPress={() => submit()}
                 />
               </HStack>
               {mic.listening ? (

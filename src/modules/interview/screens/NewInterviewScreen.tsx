@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Briefcase } from "lucide-react-native";
+import { Briefcase, FileText, ListChecks } from "lucide-react-native";
+import { useSetupConfig } from "@modules/interview/hooks/usePreparations";
 import {
   useTemplates,
   useEntitlements,
@@ -34,6 +35,8 @@ export default function NewInterviewScreen() {
   const templates = useTemplates();
   const credits = useEntitlements();
   const create = useCreateInterview();
+  const setup = useSetupConfig();
+  const minutes = Math.round((setup.data?.durationSeconds ?? 600) / 60);
   const [picked, setPicked] = useState<string | null>(null);
 
   const available = credits.data?.available ?? 0;
@@ -48,9 +51,12 @@ export default function NewInterviewScreen() {
   const [profession, setProfession] = useState("");
   const professionOk = profession.trim().length >= 2;
 
+  // Any profession works: with no pick, the first listed interview supplies the round format.
+  const templateId = picked ?? templates.data?.[0]?.id ?? null;
+
   const start = () => {
-    if (!picked || !professionOk) return;
-    create.mutate({ templateId: picked, targetRole: profession.trim() }, {
+    if (!templateId || !professionOk) return;
+    create.mutate({ templateId, targetRole: profession.trim() }, {
       onSuccess: (interview) =>
         navigation.replace("InterviewSession", { id: interview.id }),
     });
@@ -59,7 +65,7 @@ export default function NewInterviewScreen() {
   return (
     <Screen
       title="New interview"
-      subtitle="Tell us your profession, then pick the closest interview. Three rounds, 10 minutes each."
+      subtitle="Choose how to prepare. The interviewer then runs a spoken interview built on it."
     >
       <VStack gap={14}>
         <VerifyEmailCard />
@@ -81,6 +87,32 @@ export default function NewInterviewScreen() {
           <Banner tone="danger" message={apiErrorMessage(create.error)} />
         ) : null}
 
+        {setup.data && (setup.data.resumeEnabled || setup.data.mcqEnabled) ? (
+          <Card padded={false}>
+            {setup.data.resumeEnabled ? (
+              <ListRow
+                icon={FileText}
+                title="Resume-based interview"
+                subtitle={`Upload your resume (PDF or DOCX). Questions about your real projects and skills. ${minutes} minutes.`}
+                chevron
+                onPress={() => navigation.navigate("ResumeSetup")}
+              />
+            ) : null}
+            {setup.data.resumeEnabled && setup.data.mcqEnabled ? <Divider /> : null}
+            {setup.data.mcqEnabled ? (
+              <ListRow
+                icon={ListChecks}
+                title="MCQ-based preparation"
+                subtitle={`Write your own questions and answers; the interviewer talks you through those topics. ${minutes} minutes.`}
+                chevron
+                onPress={() => navigation.navigate("McqSetup")}
+              />
+            ) : null}
+          </Card>
+        ) : null}
+        <Text variant="label" tone="secondary">
+          Or the standard interview: three rounds, 10 minutes each
+        </Text>
         <Card>
           <TextField
             label="What is your profession?"
@@ -93,7 +125,7 @@ export default function NewInterviewScreen() {
           />
         </Card>
         <Text variant="label" tone="secondary">
-          Pick the closest interview
+          Interview style (optional)
         </Text>
 
         {templates.isLoading ? (
@@ -135,7 +167,7 @@ export default function NewInterviewScreen() {
         <Button
           label="Continue"
           size="lg"
-          disabled={!picked || !professionOk || !verified || noCredit}
+          disabled={!templateId || !professionOk || !verified || noCredit}
           loading={create.isPending}
           onPress={start}
         />
