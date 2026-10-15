@@ -16,6 +16,11 @@ export interface Candidate extends User {
   interviewCredits: number;
 }
 
+export interface AdminAccount extends User {
+  /** The admin from ADMIN_EMAIL in the server's .env; changed there, not in the app. */
+  managedByEnv: boolean;
+}
+
 export interface UsageToday {
   used: number;
   failures: number;
@@ -89,6 +94,30 @@ export const adminApi = {
       ),
     ),
   deleteCandidate: (id: string) => one(apiClient.delete(`/admin/candidates/${id}`)),
+  admins: async (search: string) =>
+    (
+      await apiClient.get<Paginated<AdminAccount>>("/admin/admins", {
+        params: { limit: 50, ...(search ? { search } : {}) },
+      })
+    ).data,
+  createAdmin: (displayName: string, email: string) =>
+    one(
+      apiClient.post<ApiOne<{ admin: AdminAccount; temporaryPassword: string }>>(
+        "/admin/admins",
+        { displayName, email },
+      ),
+    ),
+  renameAdmin: (id: string, displayName: string) =>
+    one(apiClient.patch<ApiOne<AdminAccount>>(`/admin/admins/${id}`, { displayName })),
+  setAdminStatus: (id: string, status: "active" | "suspended") =>
+    one(apiClient.patch<ApiOne<AdminAccount>>(`/admin/admins/${id}/status`, { status })),
+  resetAdminPassword: (id: string) =>
+    one(
+      apiClient.post<ApiOne<{ temporaryPassword: string }>>(
+        `/admin/admins/${id}/reset-password`,
+      ),
+    ),
+  deleteAdmin: (id: string) => one(apiClient.delete(`/admin/admins/${id}`)),
   aiUsage: (days: number) =>
     one(apiClient.get<ApiOne<AiUsage>>("/admin/ai-usage", { params: { days } })),
   settings: () =>

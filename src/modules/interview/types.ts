@@ -202,6 +202,8 @@ export interface Preparation {
     extractedBy: "ai" | "heuristic";
   } | null;
   questions: McqQuestion[];
+  /** A self-assessment questionnaire: the chosen option is the candidate's answer, not a "correct" one. */
+  selfAssessment: boolean;
   updatedAt: string;
 }
 

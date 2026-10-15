@@ -76,6 +76,13 @@ export default function AdminOverviewScreen() {
         />
         <Divider />
         <ListRow
+          title="Admins"
+          subtitle="Add admins, rename, reset passwords, deactivate, delete"
+          chevron
+          onPress={() => navigation.navigate("AdminAccounts")}
+        />
+        <Divider />
+        <ListRow
           title="Gemini usage"
           subtitle="Today's requests against the daily quota, and the trend"
           chevron

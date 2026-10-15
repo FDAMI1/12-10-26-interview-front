@@ -13,6 +13,7 @@ export interface McqSetInput {
   title?: string;
   targetRole: string;
   questions: McqQuestion[];
+  selfAssessment?: boolean;
 }
 
 /** The picked file as bytes: the browser hands over a File, a phone a local uri. */

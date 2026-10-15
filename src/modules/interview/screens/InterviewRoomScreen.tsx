@@ -82,7 +82,7 @@ export default function InterviewRoomScreen() {
   const canRecord = !!state?.interview.recordingEnabled && recordingSupported();
   const recorder = useRoundRecorder(live && canRecord, round?.id ?? null);
 
-  const reload = () => qc.invalidateQueries({ queryKey: ["interview-room", id] });
+  const reload = useCallback(() => qc.invalidateQueries({ queryKey: ["interview-room", id] }), [qc, id]);
 
   const answer = useMutation({
     mutationFn: ({ text, interrupted }: { text: string; interrupted?: boolean }) =>
@@ -180,7 +180,8 @@ export default function InterviewRoomScreen() {
   const lastAi = [...(state?.turns ?? [])].reverse().find((t) => t.speaker === "ai");
   const spoken = useRef<string | null>(null);
   useEffect(() => {
-    if (live && lastAi && spoken.current !== lastAi.id) {
+    // The goodbye after "please end the interview" is said even though the round has closed.
+    if ((live || lastAi?.kind === "end_call") && lastAi && spoken.current !== lastAi.id) {
       spoken.current = lastAi.id;
       const turnId = lastAi.id;
       speak(
@@ -189,13 +190,12 @@ export default function InterviewRoomScreen() {
         state?.interview.voiceEnabled && round
           ? interviewApi.turnSpeechPath(id, round.id, turnId, voice)
           : undefined,
-        // The mic opens when the interviewer stops talking - not before, or it
-        // would transcribe the question from the speakers. Not after the
-        // closing line: there is nothing left to answer.
-        lastAi.kind === "wrap_up" ? undefined : startListening,
+        // The mic opens when the interviewer stops talking (not before, or it would
+        // transcribe the question). After a goodbye the finished interview is shown.
+        lastAi.kind === "end_call" ? () => void reload() : lastAi.kind === "wrap_up" ? undefined : startListening,
       );
     }
-  }, [live, lastAi, voice, id, round, state?.interview.voiceEnabled, startListening]);
+  }, [live, lastAi, voice, id, round, state?.interview.voiceEnabled, startListening, reload]);
   useEffect(() => stopSpeaking, []);
 
   // When the local countdown reaches zero, ask the server to close the round.

@@ -78,6 +78,9 @@ function deviceVoice(voice: InterviewerVoice) {
   return english.find((v) => want.test(v.name)) ?? null;
 }
 
+// How long the server voice may take to start before the device voice reads the line.
+const SERVER_VOICE_WAIT_MS = 2500;
+
 // Bumped by every speak/stop, so audio that arrives late never plays.
 let generation = 0;
 let stopCurrent: (() => void) | null = null;
@@ -99,8 +102,10 @@ function speakWithDevice(text: string, voice: InterviewerVoice, done: () => void
   Speech.speak(text, { language: "en-US", onDone: done, onStopped: done, onError: done });
 }
 
-async function playOnWeb(path: string, done: () => void) {
+async function playOnWeb(path: string, done: () => void, canStart: () => boolean) {
   const res = await apiClient.get<Blob>(path, { responseType: "blob" });
+  // Arrived after the device voice already took over: stay silent.
+  if (!canStart()) return;
   const url = URL.createObjectURL(res.data);
   const audio = new Audio(url);
   audio.onended = () => {
@@ -182,13 +187,25 @@ export function speak(
   // an end. Roughly the time the line would take to say, then carry on.
   const safety = setTimeout(done, Math.min(45_000, 4000 + text.length * 90));
   if (!path) return speakWithDevice(text, voice, done);
-  (isWeb ? playOnWeb(path, done) : playOnNative(path, done)).then(
+  // A slow server voice would keep the candidate waiting in silence: after a
+  // short wait the device voice reads the line instead.
+  let gaveUp = false;
+  const waitTimer = setTimeout(() => {
+    if (mine !== generation || finished) return;
+    gaveUp = true;
+    stopCurrent?.();
+    speakWithDevice(text, voice, done);
+  }, SERVER_VOICE_WAIT_MS);
+  const canStart = () => mine === generation && !gaveUp;
+  (isWeb ? playOnWeb(path, done, canStart) : playOnNative(path, done)).then(
     () => {
-      // Stopped while loading: silence what has just started.
-      if (mine !== generation) stopCurrent?.();
+      clearTimeout(waitTimer);
+      // Stopped, or replaced by the device voice, while loading: silence it.
+      if (!canStart()) stopCurrent?.();
     },
     () => {
-      if (mine === generation) speakWithDevice(text, voice, done);
+      clearTimeout(waitTimer);
+      if (canStart()) speakWithDevice(text, voice, done);
     },
   );
 }

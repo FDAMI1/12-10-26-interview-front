@@ -8,6 +8,8 @@ import {
 import { StartPreparedInterview } from "@modules/interview/components/StartPreparedInterview";
 import { VerifyEmailCard } from "@modules/auth/components/VerifyEmailCard";
 import { McqQuestion, Preparation } from "@modules/interview/types";
+import { questionnaire } from "@modules/interview/questionnaire";
+import { QuestionnaireStepper } from "@modules/interview/components/QuestionnaireStepper";
 import { formatDate } from "@shared/format";
 import {
   Screen,
@@ -36,6 +38,7 @@ const blank = (): McqQuestion => ({
 export function mcqProblem(
   questions: McqQuestion[],
   max: number,
+  selfAssessment = false,
 ): string | null {
   if (!questions.length) return "Add at least one question.";
   if (questions.length > max) return `A set can have at most ${max} questions.`;
@@ -51,7 +54,9 @@ export function mcqProblem(
     if (new Set(options.map((o) => o.toLowerCase())).size !== options.length)
       return `${n}: options must all be different.`;
     if (q.correctIndex < 0 || q.correctIndex >= options.length)
-      return `${n}: mark the correct answer.`;
+      return selfAssessment
+        ? `${n}: choose your answer.`
+        : `${n}: mark the correct answer.`;
   }
   return null;
 }
@@ -61,16 +66,28 @@ export default function McqSetupScreen() {
   const sets = usePreparations("mcq");
   const save = useSaveMcqSet();
   const [setId, setSetId] = useState<string | null>(null);
-  const [questions, setQuestions] = useState<McqQuestion[]>([blank()]);
+  // A new set starts as the candidate questionnaire; the candidate can write their own quiz instead.
+  const [selfAssessment, setSelfAssessment] = useState(true);
+  const [questions, setQuestions] = useState<McqQuestion[]>(questionnaire);
+  const answered = questions.filter((q) => q.correctIndex >= 0).length;
   // Remounts the start step so its role field picks up a loaded set's role.
   const [loadedRole, setLoadedRole] = useState("");
 
   const cfg = config.data;
-  const problem = cfg ? mcqProblem(questions, cfg.mcqMaxQuestions) : null;
+  const problem = cfg
+    ? mcqProblem(questions, cfg.mcqMaxQuestions, selfAssessment)
+    : null;
+  const startNew = (asQuestionnaire: boolean) => {
+    setSetId(null);
+    setSelfAssessment(asQuestionnaire);
+    setQuestions(asQuestionnaire ? questionnaire() : [blank()]);
+    setLoadedRole("");
+  };
 
   const load = (p: Preparation) => {
     setSetId(p.id);
     setQuestions(p.questions.map((q) => ({ ...q, options: [...q.options] })));
+    setSelfAssessment(p.selfAssessment);
     setLoadedRole(p.targetRole);
   };
   const edit = (i: number, change: Partial<McqQuestion>) =>
@@ -79,7 +96,7 @@ export default function McqSetupScreen() {
   return (
     <Screen
       title="MCQ-based preparation"
-      subtitle="Write the questions you want to practise, with the right answer. The interviewer turns them into a spoken interview and never reads the answers out."
+      subtitle="Answer the candidate questionnaire, or write your own practice questions. The interviewer builds a spoken interview on them."
       back="Back"
     >
       {config.isLoading || sets.isLoading ? (
@@ -115,67 +132,90 @@ export default function McqSetupScreen() {
                   </React.Fragment>
                 ))}
               </Card>
-              {setId ? (
-                <Button
-                  label="Start a new set instead"
-                  variant="ghost"
-                  size="sm"
-                  fullWidth={false}
-                  onPress={() => {
-                    setSetId(null);
-                    setQuestions([blank()]);
-                    setLoadedRole("");
-                  }}
-                />
-              ) : null}
             </>
           ) : null}
 
-          {questions.map((q, i) => (
-            <QuestionEditor
-              key={i}
-              index={i}
-              question={q}
-              onChange={(change) => edit(i, change)}
-              onDelete={
-                questions.length > 1
-                  ? () => setQuestions((qs) => qs.filter((_, j) => j !== i))
-                  : undefined
-              }
+          <HStack gap={8} wrap>
+            <Button
+              label="Candidate questionnaire"
+              variant={selfAssessment && !setId ? "primary" : "secondary"}
+              size="sm"
+              fullWidth={false}
+              onPress={() => startNew(true)}
             />
-          ))}
-          <Button
-            label={`Add a question (${questions.length} of ${cfg.mcqMaxQuestions})`}
-            variant="secondary"
-            icon={<Plus size={16} />}
-            disabled={questions.length >= cfg.mcqMaxQuestions}
-            onPress={() => setQuestions((qs) => [...qs, blank()])}
-          />
+            <Button
+              label="Write my own questions"
+              variant={!selfAssessment && !setId ? "primary" : "secondary"}
+              size="sm"
+              fullWidth={false}
+              onPress={() => startNew(false)}
+            />
+          </HStack>
 
-          <StartPreparedInterview
-            key={setId ?? "new"}
-            setupMode="mcq"
-            preparationId={setId}
-            defaultRole={loadedRole}
-            config={cfg}
-            disabledReason={problem ?? undefined}
-            beforeStart={async (role) => {
-              // Saved every time, so the set is there for the next interview too.
-              const saved = await save.mutateAsync({
-                id: setId,
-                body: {
-                  targetRole: role,
-                  questions: questions.map((q) => ({
-                    ...q,
-                    text: q.text.trim(),
-                    options: q.options.map((o) => o.trim()),
-                  })),
-                },
-              });
-              setSetId(saved.id);
-              return saved.id;
-            }}
-          />
+          {selfAssessment ? (
+            <QuestionnaireStepper
+              // A fresh or newly loaded questionnaire starts its own steps. The
+              // prefix keeps it apart from the start step's key below.
+              key={`questionnaire-${setId ?? "new"}`}
+              questions={questions}
+              onSelect={(i, j) => edit(i, { correctIndex: j })}
+            />
+          ) : (
+            <>
+              {questions.map((q, i) => (
+                <QuestionEditor
+                  key={i}
+                  index={i}
+                  question={q}
+                  onChange={(change) => edit(i, change)}
+                  onDelete={
+                    questions.length > 1
+                      ? () => setQuestions((qs) => qs.filter((_, j) => j !== i))
+                      : undefined
+                  }
+                />
+              ))}
+              <Button
+                label={`Add a question (${questions.length} of ${cfg.mcqMaxQuestions})`}
+                variant="secondary"
+                icon={<Plus size={16} />}
+                disabled={questions.length >= cfg.mcqMaxQuestions}
+                onPress={() => setQuestions((qs) => [...qs, blank()])}
+              />
+            </>
+          )}
+
+          {/* The questionnaire leads to the role and round step once every question is answered. */}
+          {!selfAssessment || answered === questions.length ? (
+            <StartPreparedInterview
+              key={setId ?? "new"}
+              setupMode="mcq"
+              preparationId={setId}
+              defaultRole={loadedRole}
+              config={cfg}
+              disabledReason={problem ?? undefined}
+              beforeStart={async (role) => {
+                // Saved every time, so the set is there for the next interview too.
+                const saved = await save.mutateAsync({
+                  id: setId,
+                  body: {
+                    title: selfAssessment
+                      ? "Candidate questionnaire"
+                      : undefined,
+                    selfAssessment,
+                    targetRole: role,
+                    questions: questions.map((q) => ({
+                      ...q,
+                      text: q.text.trim(),
+                      options: q.options.map((o) => o.trim()),
+                    })),
+                  },
+                });
+                setSetId(saved.id);
+                return saved.id;
+              }}
+            />
+          ) : null}
         </VStack>
       )}
     </Screen>

@@ -5,6 +5,7 @@ import AdminUsersScreen from "./screens/AdminUsersScreen";
 import AdminSettingsScreen from "./screens/AdminSettingsScreen";
 import AdminCandidatesScreen from "./screens/AdminCandidatesScreen";
 import AdminUsageScreen from "./screens/AdminUsageScreen";
+import AdminAccountsScreen from "./screens/AdminAccountsScreen";
 
 export type AdminStackParamList = {
   AdminOverview: undefined;
@@ -12,6 +13,7 @@ export type AdminStackParamList = {
   AdminSettings: undefined;
   AdminCandidates: undefined;
   AdminUsage: undefined;
+  AdminAccounts: undefined;
 };
 
 const Stack = createNativeStackNavigator<AdminStackParamList>();
@@ -27,6 +29,7 @@ export default function AdminNavigator() {
       <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} />
       <Stack.Screen name="AdminCandidates" component={AdminCandidatesScreen} />
       <Stack.Screen name="AdminUsage" component={AdminUsageScreen} />
+      <Stack.Screen name="AdminAccounts" component={AdminAccountsScreen} />
     </Stack.Navigator>
   );
 }
