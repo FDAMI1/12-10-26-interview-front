@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Pressable, StyleSheet } from "react-native";
+import { View, Pressable, StyleSheet, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LogOut } from "lucide-react-native";
 import { palette, radius, layout } from "@shared/designSystem";
@@ -7,7 +7,9 @@ import { Text, VStack } from "@shared/ui";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { useVisibleNavItems } from "./navItems";
 
-export const APP_NAME = "AI Interview";
+const MARK = require("../../assets/brand/aivarnix-mark.png");
+
+export const APP_NAME = "Aivarnix";
 
 interface Props {
   activeRoute: string;
@@ -21,9 +23,12 @@ export function Sidebar({ activeRoute, onNavigate }: Props) {
 
   return (
     <SafeAreaView style={styles.wrap}>
-      <Text variant="h2" tone="accent" style={styles.brand}>
-        {APP_NAME}
-      </Text>
+      <View style={[styles.brand, styles.brandRow]} accessibilityRole="header">
+        <Image source={MARK} style={styles.mark} resizeMode="contain" accessibilityIgnoresInvertColors />
+        <Text variant="h2" style={{ color: "#0B1640" }}>
+          {APP_NAME}
+        </Text>
+      </View>
       <VStack gap={2} flex={1}>
         {items.map((item) => {
           const active = item.name === activeRoute;
@@ -78,6 +83,8 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   brand: { paddingHorizontal: 10, paddingVertical: 14 },
+  brandRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  mark: { width: 34, height: 26 },
   row: {
     flexDirection: "row",
     alignItems: "center",

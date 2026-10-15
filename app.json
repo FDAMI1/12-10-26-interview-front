@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "AI Interview",
+    "name": "Aivarnix",
     "slug": "ai-interview",
     "version": "1.0.0",
     "orientation": "default",
@@ -18,7 +18,7 @@
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0C7942"
+        "backgroundColor": "#EEF0FF"
       },
       "permissions": [
         "android.permission.INTERNET",
@@ -36,9 +36,9 @@
     "web": {
       "bundler": "metro",
       "favicon": "./assets/favicon.png",
-      "name": "AI Interview",
-      "shortName": "AI Interview",
-      "themeColor": "#0C7942",
+      "name": "Aivarnix",
+      "shortName": "Aivarnix",
+      "themeColor": "#2F5BFF",
       "backgroundColor": "#F6F8F8"
     },
     "plugins": [
@@ -66,7 +66,7 @@
         }
       ],
       "expo-asset",
-      "@react-native-google-signin/google-signin"
+      "expo-web-browser"
     ],
     "description": "Practise HR, technical and managerial interview rounds with an AI interviewer and get a scored report.",
     "icon": "./assets/icon.png",

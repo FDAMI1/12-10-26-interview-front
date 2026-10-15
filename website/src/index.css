@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+/* Aivarnix design tokens: navy type, electric-blue actions, violet accents, pale-blue surfaces. */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-navy: #0b1640;
+  --color-ink: #2a3557;
+  --color-muted: #5b6788;
+  --color-electric: #2f5bff;
+  --color-electric-dark: #2447e6;
+  --color-violet: #6d4aff;
+  --color-sky: #eef3ff;
+  --color-mist: #f6f8ff;
+  --color-line: #dfe6fb;
+  --radius-card: 1.5rem;
+  --shadow-soft: 0 18px 40px -18px rgb(78 99 184 / 0.35);
+  --shadow-glow: 0 14px 30px -10px rgb(47 91 255 / 0.55);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5.5rem;
+  }
+  body {
+    @apply bg-white text-ink antialiased;
+    font-family: var(--font-sans);
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-electric);
+    outline-offset: 3px;
+    border-radius: 0.5rem;
+  }
+}
+
+@layer components {
+  .text-gradient {
+    background: linear-gradient(90deg, var(--color-electric), var(--color-violet));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .glass {
+    background: rgb(255 255 255 / 0.72);
+    border: 1px solid rgb(255 255 255 / 0.95);
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(14px);
+  }
+  /* Fades content up as it scrolls into view (see useReveal); off for reduced motion. */
+  .reveal {
+    opacity: 0;
+    transform: translateY(18px);
+    transition:
+      opacity 0.6s ease,
+      transform 0.6s ease;
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--r, 0deg));
+  }
+  50% {
+    transform: translateY(-10px) rotate(var(--r, 0deg));
+  }
+}
+.float {
+  animation: float 7s ease-in-out infinite;
+}

@@ -18,6 +18,8 @@ interface Props extends Omit<TextInputProps, "style"> {
   trailing?: React.ReactNode;
   error?: string;
   hint?: string;
+  /** "soft": the taller, rounder, glassy field of the sign-in screens. */
+  appearance?: "default" | "soft";
 }
 
 export function TextField({
@@ -26,8 +28,10 @@ export function TextField({
   trailing,
   error,
   hint,
+  appearance = "default",
   ...inputProps
 }: Props) {
+  const soft = appearance === "soft";
   const [focused, setFocused] = useState(false);
   const controlHeight = useControlHeight();
   // Any password field gets a reveal toggle, unless the caller supplies its own
@@ -40,6 +44,7 @@ export function TextField({
       <Pressable
         onPress={() => setRevealed((r) => !r)}
         hitSlop={10}
+        accessibilityRole="button"
         accessibilityLabel={revealed ? "Hide password" : "Show password"}
       >
         {revealed ? (
@@ -72,6 +77,10 @@ export function TextField({
             borderWidth: focused ? 1.5 : 1,
             minHeight: controlHeight,
           },
+          soft && styles.soft,
+          soft &&
+            !error &&
+            !focused && { borderColor: "rgba(255,255,255,0.95)" },
         ]}
       >
         {leading && <View style={{ marginRight: 10 }}>{leading}</View>}
@@ -115,6 +124,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: radius.md,
     paddingHorizontal: 11,
+  },
+  soft: {
+    minHeight: 54,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    backgroundColor: "rgba(255,255,255,0.78)",
+    shadowColor: "#4E63B8",
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
   },
   input: {
     flex: 1,

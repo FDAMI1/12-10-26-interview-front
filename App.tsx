@@ -16,7 +16,7 @@ import {
 import RootNavigator from "@navigation/RootNavigator";
 import { palette } from "@shared/designSystem";
 
-const APP_TITLE = "AI Interview";
+const APP_TITLE = "Aivarnix";
 
 const queryClient = new QueryClient({
   defaultOptions: {

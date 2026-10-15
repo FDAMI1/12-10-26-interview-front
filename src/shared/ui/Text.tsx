@@ -1,6 +1,6 @@
 /** Text — all typography routes through here for a consistent type system. */
 import React from "react";
-import { Text as RNText, TextStyle, StyleProp } from "react-native";
+import { Text as RNText, TextProps, TextStyle, StyleProp } from "react-native";
 import { typography, palette, fonts } from "../designSystem";
 
 type Variant =
@@ -45,6 +45,8 @@ interface Props {
    */
   maxFontSizeMultiplier?: number;
   style?: StyleProp<TextStyle>;
+  /** "header" marks a heading for screen readers. */
+  accessibilityRole?: TextProps["accessibilityRole"];
   children: React.ReactNode;
 }
 
@@ -151,11 +153,13 @@ export function Text({
   adjustsFontSizeToFit,
   maxFontSizeMultiplier,
   style,
+  accessibilityRole,
   children,
 }: Props) {
   const base = variantMap[variant];
   return (
     <RNText
+      accessibilityRole={accessibilityRole}
       numberOfLines={numberOfLines}
       adjustsFontSizeToFit={adjustsFontSizeToFit}
       // An explicit prop wins; otherwise the role's ceiling; otherwise none.

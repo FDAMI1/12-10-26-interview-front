@@ -23,8 +23,9 @@ export interface User {
   authType: "password" | "api";
   /** Signed in with an admin-issued temporary password; must choose their own first. */
   mustChangePassword: boolean;
-  /** Has used "Continue with Google". */
+  /** Has used "Continue with Google" / "Continue with GitHub". */
   googleLinked?: boolean;
+  githubLinked?: boolean;
   /** False for a Google-only account that has never set a password. */
   hasPassword?: boolean;
   locale: string;
@@ -58,18 +59,64 @@ export const isTokenExpired = (token: string | null) => {
   }
 };
 
+/**
+ * "Remember me". Remembered (the default): the session is kept on the device
+ * (localStorage on the web, the secure keychain on a phone). Not remembered:
+ * it lives only for this browser tab (sessionStorage) or, on a phone, until
+ * the app is closed (memory). The choice is read back from where the session
+ * was found, so a reload keeps honouring it.
+ */
+let rememberSession = true;
+const memory = new Map<string, string>();
+
+export function setRememberMe(remember: boolean) {
+  rememberSession = remember;
+}
+
+const isWebStorage = Platform.OS === "web";
+const persistent = {
+  get: (k: string) =>
+    isWebStorage
+      ? Promise.resolve(localStorage.getItem(k))
+      : SecureStore.getItemAsync(k),
+  set: (k: string, v: string) =>
+    isWebStorage
+      ? Promise.resolve(localStorage.setItem(k, v))
+      : SecureStore.setItemAsync(k, v),
+  remove: (k: string) =>
+    isWebStorage
+      ? Promise.resolve(localStorage.removeItem(k))
+      : SecureStore.deleteItemAsync(k),
+};
+const temporary = {
+  get: (k: string) =>
+    isWebStorage ? sessionStorage.getItem(k) : (memory.get(k) ?? null),
+  set: (k: string, v: string) =>
+    isWebStorage ? sessionStorage.setItem(k, v) : void memory.set(k, v),
+  remove: (k: string) =>
+    isWebStorage ? sessionStorage.removeItem(k) : void memory.delete(k),
+};
+
 const secureStorage: StateStorage = {
   getItem: async (name) => {
-    if (Platform.OS === "web") return localStorage.getItem(name);
-    return await SecureStore.getItemAsync(name);
+    const kept = await persistent.get(name);
+    if (kept) return kept;
+    const forThisSession = temporary.get(name);
+    if (forThisSession) rememberSession = false;
+    return forThisSession;
   },
   setItem: async (name, value) => {
-    if (Platform.OS === "web") localStorage.setItem(name, value);
-    else await SecureStore.setItemAsync(name, value);
+    if (rememberSession) {
+      temporary.remove(name);
+      await persistent.set(name, value);
+    } else {
+      await persistent.remove(name);
+      temporary.set(name, value);
+    }
   },
   removeItem: async (name) => {
-    if (Platform.OS === "web") localStorage.removeItem(name);
-    else await SecureStore.deleteItemAsync(name);
+    temporary.remove(name);
+    await persistent.remove(name);
   },
 };
 

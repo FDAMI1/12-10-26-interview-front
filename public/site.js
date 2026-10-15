@@ -11,7 +11,7 @@ window.SITE = {
 document.addEventListener("DOMContentLoaded", function () {
   var s = window.SITE;
   document.querySelectorAll("[data-operator]").forEach(function (el) {
-    el.textContent = s.operator || "the operator of AI Interview";
+    el.textContent = s.operator || "the operator of Aivarnix";
   });
   document.querySelectorAll("[data-contact]").forEach(function (el) {
     if (s.supportEmail) {
