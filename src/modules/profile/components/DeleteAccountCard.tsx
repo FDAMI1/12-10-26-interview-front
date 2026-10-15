@@ -20,9 +20,14 @@ import {
 export function DeleteAccountCard() {
   const qc = useQueryClient();
   const [password, setPassword] = useState("");
+  // A Google-only account has no password: it confirms by typing its email.
+  const hasPassword = useAuthStore((s) => s.user?.hasPassword !== false);
   const [confirming, setConfirming] = useState(false);
   const remove = useMutation({
-    mutationFn: () => profileApi.deleteAccount(password),
+    mutationFn: () =>
+      profileApi.deleteAccount(
+        hasPassword ? { password } : { confirmEmail: password },
+      ),
     onSettled: () => setConfirming(false),
     onSuccess: async () => {
       qc.clear();
@@ -40,11 +45,16 @@ export function DeleteAccountCard() {
           memberships. It cannot be undone.
         </Text>
         <TextField
-          label="Your password"
+          label={hasPassword ? "Your password" : "Your email address"}
           value={password}
           onChangeText={setPassword}
-          secureTextEntry
-          placeholder="Enter your password to confirm"
+          secureTextEntry={hasPassword}
+          keyboardType={hasPassword ? "default" : "email-address"}
+          placeholder={
+            hasPassword
+              ? "Enter your password to confirm"
+              : "Type your email to confirm"
+          }
           autoCapitalize="none"
         />
         {remove.isError ? (

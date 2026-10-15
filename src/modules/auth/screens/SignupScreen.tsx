@@ -8,6 +8,7 @@ import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { VStack, Button, Banner } from "@shared/ui";
 import { AuthLayout } from "@modules/auth/components/AuthLayout";
 import { AuthFooterLink } from "@modules/auth/components/AuthFooterLink";
+import { ContinueWithGoogle } from "@modules/auth/components/ContinueWithGoogle";
 
 type Nav = { navigate: (s: string) => void };
 
@@ -58,6 +59,7 @@ export default function SignupScreen({ navigation }: { navigation: Nav }) {
           loading={mut.isPending}
           size="lg"
         />
+        <ContinueWithGoogle />
         <AuthFooterLink
           prompt="Already have an account?"
           label="Sign in"

@@ -11,6 +11,7 @@ import { palette } from "@shared/designSystem";
 import { Text, VStack, Button, Banner } from "@shared/ui";
 import { AuthLayout } from "@modules/auth/components/AuthLayout";
 import { AuthFooterLink } from "@modules/auth/components/AuthFooterLink";
+import { ContinueWithGoogle } from "@modules/auth/components/ContinueWithGoogle";
 
 type Nav = { navigate: (s: string) => void };
 
@@ -66,6 +67,7 @@ export default function LoginScreen({ navigation }: { navigation: Nav }) {
           loading={mut.isPending}
           size="lg"
         />
+        <ContinueWithGoogle />
         <AuthFooterLink
           prompt="New here?"
           label="Create an account"

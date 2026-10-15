@@ -8,6 +8,10 @@ const applyAuth = ({ user, accessToken, refreshToken }: AuthData) =>
 export const useLogin = () =>
   useMutation({ mutationFn: authApi.login, onSuccess: applyAuth });
 
+/** "Continue with Google": one call signs in, links or creates the account. */
+export const useGoogleSignIn = () =>
+  useMutation({ mutationFn: authApi.google, onSuccess: applyAuth });
+
 /** Registering signs the candidate in; email verification follows in-app. */
 export const useRegister = () =>
   useMutation({ mutationFn: authApi.register, onSuccess: applyAuth });

@@ -8,9 +8,20 @@ export interface AuthData {
 }
 type Message = ApiOne<{ message: string }>;
 
+export interface AuthProviders {
+  /** Public OAuth client ids; null when the server has no Google sign-in. */
+  google: { webClientId: string; androidClientId: string; iosClientId: string } | null;
+}
+
 export const authApi = {
   login: async (payload: { email: string; password: string }) =>
     (await apiClient.post<ApiOne<AuthData>>("/auth/login", payload)).data.data,
+  providers: async () =>
+    (await apiClient.get<ApiOne<AuthProviders>>("/auth/providers")).data.data,
+  /** Signs in, links or creates the account for a Google ID token. */
+  google: async (idToken: string) =>
+    (await apiClient.post<ApiOne<AuthData>>("/auth/google", { idToken })).data
+      .data,
   register: async (payload: {
     displayName: string;
     email: string;

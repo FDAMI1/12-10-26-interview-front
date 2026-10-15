@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "expo export -p web",
+  "buildCommand": "node scripts/check-web-env.js && expo export -p web",
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "framework": null,

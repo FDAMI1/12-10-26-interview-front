@@ -10,7 +10,8 @@ import { useAuthStore } from "@shared/store/useAuthStore";
 import { palette, radius, shadows } from "@shared/designSystem";
 import { Text, VStack, HStack, Button, Banner, TextField } from "@shared/ui";
 
-const host = (url: string) => url.replace(/^https?:\/\//, "").replace(/\/api\/v1$/, "");
+const host = (url: string) =>
+  url.replace(/^https?:\/\//, "").replace(/\/api\/v1$/, "");
 
 /**
  * Which API the phone app talks to. Shown on the sign-in screen of phone
@@ -19,7 +20,10 @@ const host = (url: string) => url.replace(/^https?:\/\//, "").replace(/\/api\/v1
 export function ServerAddress() {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(environment.apiUrl);
-  const [state, setState] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
+  const [state, setState] = useState<{
+    tone: "success" | "danger";
+    text: string;
+  } | null>(null);
   const [checking, setChecking] = useState(false);
   if (!serverChangeAllowed) return null;
 
@@ -27,23 +31,35 @@ export function ServerAddress() {
     const res = await fetch(url.replace(/\/api\/v1$/, "") + "/health", {
       signal: AbortSignal.timeout(60_000),
     });
-    const body = (await res.json().catch(() => null)) as { success?: boolean } | null;
+    const body = (await res.json().catch(() => null)) as {
+      success?: boolean;
+    } | null;
     return res.ok && !!body?.success;
   };
 
   const test = async () => {
     const url = normalizeApiUrl(value);
-    if (!url) return setState({ tone: "danger", text: "Enter an address starting with https:// or http://" });
+    if (!url)
+      return setState({
+        tone: "danger",
+        text: "Enter an address starting with https:// or http://",
+      });
     setChecking(true);
     setState(null);
     try {
       setState(
         (await check(url))
           ? { tone: "success", text: "Connected. This server is reachable." }
-          : { tone: "danger", text: "That address answered, but it is not this app's server." },
+          : {
+              tone: "danger",
+              text: "That address answered, but it is not this app's server.",
+            },
       );
     } catch {
-      setState({ tone: "danger", text: "Could not reach that address. Check it and your internet connection." });
+      setState({
+        tone: "danger",
+        text: "Could not reach that address. Check it and your internet connection.",
+      });
     } finally {
       setChecking(false);
     }
@@ -57,13 +73,29 @@ export function ServerAddress() {
 
   return (
     <>
-      <Pressable onPress={() => setOpen(true)} hitSlop={8} accessibilityRole="button">
+      <Pressable
+        onPress={() => setOpen(true)}
+        hitSlop={8}
+        accessibilityRole="button"
+      >
         <Text variant="caption" tone="tertiary" align="center">
           Server: {host(environment.apiUrl)} · Change
         </Text>
       </Pressable>
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <View style={{ flex: 1, backgroundColor: "rgba(15,23,42,0.45)", justifyContent: "center", padding: 20 }}>
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(15,23,42,0.45)",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
           <View
             style={{
               backgroundColor: palette.surface.primary,
@@ -94,14 +126,25 @@ export function ServerAddress() {
               />
               {state ? <Banner tone={state.tone} message={state.text} /> : null}
               <HStack gap={8} wrap>
-                <Button label="Test" variant="secondary" fullWidth={false} loading={checking} onPress={() => void test()} />
+                <Button
+                  label="Test"
+                  variant="secondary"
+                  fullWidth={false}
+                  loading={checking}
+                  onPress={() => void test()}
+                />
                 <Button
                   label="Save"
                   fullWidth={false}
                   disabled={!normalizeApiUrl(value)}
                   onPress={() => void save(normalizeApiUrl(value))}
                 />
-                <Button label="Cancel" variant="ghost" fullWidth={false} onPress={() => setOpen(false)} />
+                <Button
+                  label="Cancel"
+                  variant="ghost"
+                  fullWidth={false}
+                  onPress={() => setOpen(false)}
+                />
               </HStack>
               <Button
                 label={`Use the built-in address (${host(environment.builtApiUrl)})`}

@@ -11,6 +11,13 @@ import * as SecureStore from "expo-secure-store";
  * tunnel today and the deployed server tomorrow without a rebuild. The website
  * always uses its built-in address: it is served next to its own API.
  */
+/** Adds the /api/v1 root when a built-in address was given without it. */
+function withApiRoot(url?: string) {
+  const base = (url || "").trim().replace(/\/+$/, "");
+  if (!base) return "";
+  return base.endsWith("/api/v1") ? base : `${base}/api/v1`;
+}
+
 const ENV = {
   development: {
     apiUrl:
@@ -18,7 +25,10 @@ const ENV = {
     webUrl: process.env.EXPO_PUBLIC_WEB_URL || "http://localhost:8081",
   },
   production: {
-    apiUrl: process.env.EXPO_PUBLIC_API_URL || "http://localhost:6010/api/v1",
+    // "https://x.onrender.com" and ".../api/v1" both work (see normalizeApiUrl).
+    apiUrl:
+      withApiRoot(process.env.EXPO_PUBLIC_API_URL) ||
+      "http://localhost:6010/api/v1",
     // The website, for links the phone app opens in a browser.
     webUrl: process.env.EXPO_PUBLIC_WEB_URL || "",
   },

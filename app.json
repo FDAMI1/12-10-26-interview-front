@@ -65,7 +65,8 @@
           "recordAudioAndroid": false
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "@react-native-google-signin/google-signin"
     ],
     "description": "Practise HR, technical and managerial interview rounds with an AI interviewer and get a scored report.",
     "icon": "./assets/icon.png",

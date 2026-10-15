@@ -28,8 +28,9 @@ export const profileApi = {
   updateMe: async (displayName: string) =>
     (await apiClient.patch<ApiOne<User>>("/me", { displayName })).data.data,
   /** Permanently deletes the signed-in account and its data. */
-  deleteAccount: async (password: string) =>
-    (await apiClient.delete<ApiOne<{ message: string }>>("/me", { data: { password } })).data.data,
+  /** Confirmed with the password, or for a Google-only account with its email address. */
+  deleteAccount: async (confirm: { password: string } | { confirmEmail: string }) =>
+    (await apiClient.delete<ApiOne<{ message: string }>>("/me", { data: confirm })).data.data,
   updateCandidateProfile: async (profile: CandidateProfile) =>
     (
       await apiClient.put<ApiOne<CandidateProfile>>(

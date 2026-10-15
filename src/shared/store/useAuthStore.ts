@@ -23,6 +23,10 @@ export interface User {
   authType: "password" | "api";
   /** Signed in with an admin-issued temporary password; must choose their own first. */
   mustChangePassword: boolean;
+  /** Has used "Continue with Google". */
+  googleLinked?: boolean;
+  /** False for a Google-only account that has never set a password. */
+  hasPassword?: boolean;
   locale: string;
   timezone: string;
 }
