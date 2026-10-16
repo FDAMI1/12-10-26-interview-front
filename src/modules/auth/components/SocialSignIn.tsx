@@ -51,7 +51,15 @@ if (isWeb && window.location.hash.includes("oauth")) {
  * by leaving for the provider and returning to /login; on a phone, in an
  * in-app browser tab that returns through the app's own link.
  */
-export function SocialSignIn() {
+/** True when the page has just come back from Google / GitHub with a sign-in to finish. */
+export const hasPendingOAuthReturn = () => Boolean(arrival?.code);
+
+interface Props {
+  /** The returning sign-in could not be completed; the message says why. */
+  onReturnFailed?: (message: string) => void;
+}
+
+export function SocialSignIn({ onReturnFailed }: Props = {}) {
   const providers = useQuery({
     queryKey: ["auth-providers"],
     queryFn: authApi.providers,
@@ -65,7 +73,16 @@ export function SocialSignIn() {
   useEffect(() => {
     const code = arrival?.code;
     arrival = null;
-    if (code) exchange.mutate(code);
+    if (code)
+      exchange.mutate(code, {
+        onError: (e) =>
+          onReturnFailed?.(
+            apiErrorMessage(
+              e,
+              "Sign-in could not be completed. Please try again.",
+            ),
+          ),
+      });
     // Once, on arrival.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -118,29 +135,38 @@ export function SocialSignIn() {
           message={problem ?? apiErrorMessage(exchange.error, "Sign-in failed")}
         />
       ) : null}
-      <HStack gap={16} justify="center">
-        {offered.map((p) => (
-          <Pressable
-            key={p}
-            onPress={() => void start(p)}
-            disabled={busy || opening !== null}
-            accessibilityRole="button"
-            accessibilityLabel={`Continue with ${LABEL[p]}`}
-            accessibilityState={{ busy: busy || opening === p }}
-            style={({ pressed }) => [
-              styles.tile,
-              pressed && styles.tilePressed,
-            ]}
-          >
-            {opening === p || (busy && opening === null) ? (
-              <ActivityIndicator color={authTheme.blue} />
-            ) : p === "google" ? (
-              <GoogleMark size={26} />
-            ) : (
-              <GitHubMark size={26} />
-            )}
-          </Pressable>
-        ))}
+      <HStack gap={12}>
+        {offered.map((p) => {
+          const waiting = opening === p || (busy && opening === null);
+          return (
+            <Pressable
+              key={p}
+              onPress={() => void start(p)}
+              disabled={busy || opening !== null}
+              accessibilityRole="button"
+              accessibilityLabel={`Continue with ${LABEL[p]}`}
+              accessibilityState={{
+                busy: waiting,
+                disabled: busy || opening !== null,
+              }}
+              style={({ pressed }) => [
+                styles.button,
+                pressed && styles.pressed,
+              ]}
+            >
+              {waiting ? (
+                <ActivityIndicator color={authTheme.blue} size="small" />
+              ) : p === "google" ? (
+                <GoogleMark size={20} />
+              ) : (
+                <GitHubMark size={20} />
+              )}
+              <Text variant="label" style={styles.label}>
+                {LABEL[p]}
+              </Text>
+            </Pressable>
+          );
+        })}
       </HStack>
     </VStack>
   );
@@ -149,20 +175,25 @@ export function SocialSignIn() {
 const styles = StyleSheet.create({
   line: { flex: 1, height: 1, backgroundColor: "rgba(47,91,255,0.25)" },
   or: { color: authTheme.muted, letterSpacing: 2.2 },
-  tile: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
+  // Equal-width buttons side by side, icon and provider name, as in the reference design.
+  button: {
+    flex: 1,
+    minHeight: 52,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: authTheme.glass,
+    gap: 10,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    backgroundColor: "rgba(255,255,255,0.85)",
     borderWidth: 1,
-    borderColor: authTheme.glassBorder,
+    borderColor: "#DCE3F5",
     shadowColor: authTheme.shadow,
-    shadowOpacity: 0.16,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
   },
-  tilePressed: { transform: [{ scale: 0.96 }] },
+  pressed: { backgroundColor: "#F3F6FF", transform: [{ scale: 0.98 }] },
+  label: { color: authTheme.navy, fontSize: 15 },
 });

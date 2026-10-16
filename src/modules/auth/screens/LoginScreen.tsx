@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, Lock, Mail } from "lucide-react-native";
@@ -12,7 +12,10 @@ import { Text, VStack, HStack, Banner } from "@shared/ui";
 import { AuthLayout } from "@modules/auth/components/AuthLayout";
 import { AuthButton } from "@modules/auth/components/AuthButton";
 import { AuthFooterLink } from "@modules/auth/components/AuthFooterLink";
-import { SocialSignIn } from "@modules/auth/components/SocialSignIn";
+import {
+  SocialSignIn,
+  hasPendingOAuthReturn,
+} from "@modules/auth/components/SocialSignIn";
 import { authTheme as t } from "@modules/auth/authTheme";
 
 type Nav = { navigate: (s: string) => void };
@@ -20,6 +23,13 @@ type Nav = { navigate: (s: string) => void };
 export default function LoginScreen({ navigation }: { navigation: Nav }) {
   const mut = useLogin();
   const [remember, setRemember] = useState(true);
+  // Back from Google / GitHub: go straight into the app, no form in between.
+  const [finishing, setFinishing] = useState(hasPendingOAuthReturn);
+  const [returnError, setReturnError] = useState<string | null>(null);
+  const returnFailed = (message: string) => {
+    setReturnError(message);
+    setFinishing(false);
+  };
   const { control, handleSubmit } = useForm({
     resolver: zodResolver(loginSchema),
     mode: "onTouched",
@@ -37,9 +47,30 @@ export default function LoginScreen({ navigation }: { navigation: Nav }) {
       return !r;
     });
 
+  if (finishing)
+    return (
+      <AuthLayout
+        title="Signing you in…"
+        subtitle="Finishing your Google or GitHub sign-in"
+      >
+        <VStack gap={16} align="center">
+          <ActivityIndicator
+            size="large"
+            color={t.blue}
+            accessibilityLabel="Signing you in"
+          />
+          {/* Completes the sign-in; never shown. */}
+          <View style={{ display: "none" }}>
+            <SocialSignIn onReturnFailed={returnFailed} />
+          </View>
+        </VStack>
+      </AuthLayout>
+    );
+
   return (
     <AuthLayout title="Welcome Back" subtitle="Sign in to continue">
       <VStack gap={16}>
+        {returnError ? <Banner tone="danger" message={returnError} /> : null}
         {mut.isError ? (
           <Banner
             tone="danger"
