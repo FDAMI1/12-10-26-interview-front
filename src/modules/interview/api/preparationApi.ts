@@ -11,9 +11,11 @@ const one = async <T>(p: Promise<{ data: ApiOne<T> }>) => (await p).data.data;
 
 export interface McqSetInput {
   title?: string;
-  targetRole: string;
+  /** Required to create a set; a questionnaire saves its answers before the role is known. */
+  targetRole?: string;
   questions: McqQuestion[];
   selfAssessment?: boolean;
+  introduction?: string;
 }
 
 /** The picked file as bytes: the browser hands over a File, a phone a local uri. */
@@ -48,6 +50,9 @@ export const preparationApi = {
     ),
   createMcq: (body: McqSetInput) =>
     one(apiClient.post<ApiOne<Preparation>>("/preparations/mcq", body)),
+  /** A new questionnaire session: the server deals its five questions. */
+  createQuestionnaire: () =>
+    one(apiClient.post<ApiOne<Preparation>>("/preparations/questionnaire", {})),
   update: (id: string, body: McqSetInput | { targetRole: string }) =>
     one(apiClient.put<ApiOne<Preparation>>(`/preparations/${id}`, body)),
   remove: async (id: string) => {

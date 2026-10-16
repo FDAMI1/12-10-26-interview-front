@@ -1,15 +1,17 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react-native";
 import {
   useSetupConfig,
   usePreparations,
   useSaveMcqSet,
+  useCreateQuestionnaire,
 } from "@modules/interview/hooks/usePreparations";
 import { StartPreparedInterview } from "@modules/interview/components/StartPreparedInterview";
 import { VerifyEmailCard } from "@modules/auth/components/VerifyEmailCard";
 import { McqQuestion, Preparation } from "@modules/interview/types";
-import { questionnaire } from "@modules/interview/questionnaire";
 import { QuestionnaireStepper } from "@modules/interview/components/QuestionnaireStepper";
+import { IntroductionField } from "@modules/interview/components/IntroductionField";
+import { apiErrorMessage } from "@api/apiClient";
 import { formatDate } from "@shared/format";
 import {
   Screen,
@@ -28,6 +30,8 @@ import {
 
 const LETTERS = "ABCDEF";
 const MAX_OPTIONS = 6;
+// Typing pauses this long before the introduction is saved.
+const INTRO_SAVE_MS = 1200;
 const blank = (): McqQuestion => ({
   text: "",
   options: ["", "", "", ""],
@@ -61,42 +65,113 @@ export function mcqProblem(
   return null;
 }
 
+/** What is on screen: a saved set being edited, or a new one not saved yet. */
+interface Draft {
+  id: string | null;
+  selfAssessment: boolean;
+  questions: McqQuestion[];
+  introduction: string;
+  role: string;
+}
+const fromPreparation = (p: Preparation): Draft => ({
+  id: p.id,
+  selfAssessment: p.selfAssessment,
+  questions: p.questions.map((q) => ({ ...q, options: [...q.options] })),
+  introduction: p.introduction ?? "",
+  role: p.targetRole,
+});
+const fresh = (selfAssessment: boolean): Draft => ({
+  id: null,
+  selfAssessment,
+  questions: selfAssessment ? [] : [blank()],
+  introduction: "",
+  role: "",
+});
+
 export default function McqSetupScreen() {
   const config = useSetupConfig();
   const sets = usePreparations("mcq");
   const save = useSaveMcqSet();
-  const [setId, setSetId] = useState<string | null>(null);
-  // A new set starts as the candidate questionnaire; the candidate can write their own quiz instead.
-  const [selfAssessment, setSelfAssessment] = useState(true);
-  const [questions, setQuestions] = useState<McqQuestion[]>(questionnaire);
+  const newQuestionnaire = useCreateQuestionnaire();
+  const [edited, setEdited] = useState<Draft | null>(null);
+  // The questionnaire is dealt by the server and kept there: five questions
+  // per session, the same five after a refresh. Until the candidate picks or
+  // starts a set, the latest questionnaire is the one on screen.
+  const latest = sets.data?.find((p) => p.selfAssessment) ?? null;
+  const current: Draft =
+    edited ?? (latest ? fromPreparation(latest) : fresh(true));
+  const { id: setId, selfAssessment, questions, introduction } = current;
   const answered = questions.filter((q) => q.correctIndex >= 0).length;
-  // Remounts the start step so its role field picks up a loaded set's role.
-  const [loadedRole, setLoadedRole] = useState("");
-
   const cfg = config.data;
   const problem = cfg
     ? mcqProblem(questions, cfg.mcqMaxQuestions, selfAssessment)
     : null;
-  const startNew = (asQuestionnaire: boolean) => {
-    setSetId(null);
-    setSelfAssessment(asQuestionnaire);
-    setQuestions(asQuestionnaire ? questionnaire() : [blank()]);
-    setLoadedRole("");
-  };
 
   const load = (p: Preparation) => {
-    setSetId(p.id);
-    setQuestions(p.questions.map((q) => ({ ...q, options: [...q.options] })));
-    setSelfAssessment(p.selfAssessment);
-    setLoadedRole(p.targetRole);
+    introSaved.current = p.introduction ?? "";
+    setEdited(fromPreparation(p));
   };
+  const update = (patch: Partial<Draft>) => setEdited({ ...current, ...patch });
+
+  // A first visit with no questionnaire yet: deal one.
+  const dealt = useRef(false);
+  const deal = newQuestionnaire.mutate;
+  useEffect(() => {
+    if (dealt.current || edited || !sets.data || latest || !cfg?.mcqEnabled)
+      return;
+    dealt.current = true;
+    deal(undefined, { onSuccess: (p) => setEdited(fromPreparation(p)) });
+  }, [edited, sets.data, latest, cfg?.mcqEnabled, deal]);
+
+  const startNew = (asQuestionnaire: boolean) => {
+    introSaved.current = "";
+    setEdited(fresh(asQuestionnaire));
+    if (asQuestionnaire)
+      deal(undefined, { onSuccess: (p) => setEdited(fromPreparation(p)) });
+  };
+
   const edit = (i: number, change: Partial<McqQuestion>) =>
-    setQuestions((qs) => qs.map((q, j) => (j === i ? { ...q, ...change } : q)));
+    update({
+      questions: questions.map((q, j) => (j === i ? { ...q, ...change } : q)),
+    });
+
+  // Questionnaire answers are saved as they are chosen, so a refresh keeps them.
+  const answerQuestionnaire = (i: number, option: number) => {
+    const next = questions.map((q, j) =>
+      j === i ? { ...q, correctIndex: option } : q,
+    );
+    update({ questions: next });
+    if (setId)
+      save.mutate({
+        id: setId,
+        body: { selfAssessment: true, questions: next },
+      });
+  };
+
+  // The introduction too, a moment after typing or dictation pauses. What a
+  // loaded set already holds counts as saved.
+  const introSaved = useRef<string | null>(null);
+  const saveIntro = save.mutate;
+  useEffect(() => {
+    if (introSaved.current === null) introSaved.current = introduction;
+    if (!setId || !selfAssessment || introduction === introSaved.current)
+      return;
+    const timer = setTimeout(() => {
+      introSaved.current = introduction;
+      saveIntro({
+        id: setId,
+        body: { selfAssessment: true, questions, introduction },
+      });
+    }, INTRO_SAVE_MS);
+    return () => clearTimeout(timer);
+    // Only the text decides when to save; the answers are read at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [introduction, setId, selfAssessment, saveIntro]);
 
   return (
     <Screen
       title="MCQ-based preparation"
-      subtitle="Answer the candidate questionnaire, or write your own practice questions. The interviewer builds a spoken interview on them."
+      subtitle="Tell us about yourself and answer five short questions, or write your own practice questions. The interviewer builds a spoken interview on them."
       back="Back"
     >
       {config.isLoading || sets.isLoading ? (
@@ -137,10 +212,11 @@ export default function McqSetupScreen() {
 
           <HStack gap={8} wrap>
             <Button
-              label="Candidate questionnaire"
+              label="New questionnaire"
               variant={selfAssessment && !setId ? "primary" : "secondary"}
               size="sm"
               fullWidth={false}
+              loading={newQuestionnaire.isPending}
               onPress={() => startNew(true)}
             />
             <Button
@@ -151,15 +227,38 @@ export default function McqSetupScreen() {
               onPress={() => startNew(false)}
             />
           </HStack>
+          {newQuestionnaire.isError ? (
+            <Banner
+              tone="danger"
+              message={apiErrorMessage(newQuestionnaire.error)}
+            />
+          ) : null}
+          {save.isError ? (
+            <Banner
+              tone="danger"
+              title="Your answers were not saved"
+              message={apiErrorMessage(save.error)}
+            />
+          ) : null}
 
           {selfAssessment ? (
-            <QuestionnaireStepper
-              // A fresh or newly loaded questionnaire starts its own steps. The
-              // prefix keeps it apart from the start step's key below.
-              key={`questionnaire-${setId ?? "new"}`}
-              questions={questions}
-              onSelect={(i, j) => edit(i, { correctIndex: j })}
-            />
+            <>
+              <IntroductionField
+                value={introduction}
+                onChange={(text) => update({ introduction: text })}
+              />
+              {questions.length ? (
+                <QuestionnaireStepper
+                  // A fresh or newly loaded questionnaire starts its own steps. The
+                  // prefix keeps it apart from the start step's key below.
+                  key={`questionnaire-${setId ?? "new"}`}
+                  questions={questions}
+                  onSelect={answerQuestionnaire}
+                />
+              ) : (
+                <Skeleton height={160} />
+              )}
+            </>
           ) : (
             <>
               {questions.map((q, i) => (
@@ -170,7 +269,10 @@ export default function McqSetupScreen() {
                   onChange={(change) => edit(i, change)}
                   onDelete={
                     questions.length > 1
-                      ? () => setQuestions((qs) => qs.filter((_, j) => j !== i))
+                      ? () =>
+                          update({
+                            questions: questions.filter((_, j) => j !== i),
+                          })
                       : undefined
                   }
                 />
@@ -180,18 +282,19 @@ export default function McqSetupScreen() {
                 variant="secondary"
                 icon={<Plus size={16} />}
                 disabled={questions.length >= cfg.mcqMaxQuestions}
-                onPress={() => setQuestions((qs) => [...qs, blank()])}
+                onPress={() => update({ questions: [...questions, blank()] })}
               />
             </>
           )}
 
           {/* The questionnaire leads to the role and round step once every question is answered. */}
-          {!selfAssessment || answered === questions.length ? (
+          {!selfAssessment ||
+          (questions.length && answered === questions.length) ? (
             <StartPreparedInterview
               key={setId ?? "new"}
               setupMode="mcq"
               preparationId={setId}
-              defaultRole={loadedRole}
+              defaultRole={current.role}
               config={cfg}
               disabledReason={problem ?? undefined}
               beforeStart={async (role) => {
@@ -204,6 +307,7 @@ export default function McqSetupScreen() {
                       : undefined,
                     selfAssessment,
                     targetRole: role,
+                    introduction: selfAssessment ? introduction : undefined,
                     questions: questions.map((q) => ({
                       ...q,
                       text: q.text.trim(),
@@ -211,7 +315,7 @@ export default function McqSetupScreen() {
                     })),
                   },
                 });
-                setSetId(saved.id);
+                update({ id: saved.id });
                 return saved.id;
               }}
             />

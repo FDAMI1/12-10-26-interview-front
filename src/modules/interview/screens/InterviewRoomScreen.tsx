@@ -5,17 +5,23 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Mic, MicOff, Send } from "lucide-react-native";
 import { VoicePicker } from "@modules/interview/components/VoicePicker";
+import {
+  MicProblemBanner,
+  RoundBreak,
+  TURN_LABEL,
+  TurnBubble,
+} from "@modules/interview/components/RoomParts";
 import { interviewApi } from "@modules/interview/api/interviewApi";
 import { useRoom } from "@modules/interview/hooks/useInterviews";
 import { useCountdown } from "@modules/interview/hooks/useCountdown";
 import { useRelevanceMonitor } from "@modules/interview/hooks/useRelevanceMonitor";
+import { useVoiceTurn } from "@modules/interview/hooks/useVoiceTurn";
 import {
   speak,
   stopSpeaking,
   getVoicePreference,
   setVoicePreference,
   InterviewerVoice,
-  useSpeechRecognition,
 } from "@modules/interview/voice";
 import {
   useRoundRecorder,
@@ -45,51 +51,35 @@ const LIVE = ["in_progress", "reconnecting"];
 
 export default function InterviewRoomScreen() {
   const navigation = useNavigation<Nav>();
-  const { id } = useRoute<RouteProp<InterviewsStackParamList, "InterviewRoom">>().params;
+  const { id } =
+    useRoute<RouteProp<InterviewsStackParamList, "InterviewRoom">>().params;
   const qc = useQueryClient();
   const room = useRoom(id);
   const state = room.data;
   const round = state?.currentRound ?? null;
   const live = !!round && LIVE.includes(round.status);
 
-  const [draft, setDraft] = useState("");
   const [voice, setVoice] = useState<InterviewerVoice>(getVoicePreference);
-  // Hands-free answering: the mic opens after each question, and a spoken
-  // answer is sent once the candidate has been silent for the threshold.
-  const lastSound = useRef(0);
-  // True once this answer contains dictated words. Typing clears it, so an
-  // answer being edited by hand is never sent out from under the candidate.
-  const dictated = useRef(false);
-  const draftRef = useRef("");
-  const [silentMs, setSilentMs] = useState(0);
-  const mic = useSpeechRecognition(
-    (text) => {
-      dictated.current = true;
-      lastSound.current = Date.now();
-      setDraft((d) => {
-        const next = d ? `${d} ${text}` : text;
-        draftRef.current = next;
-        return next;
-      });
-    },
-    () => {
-      lastSound.current = Date.now();
-    },
-  );
   const seconds = useCountdown(live && state ? state.deadlineMs : null);
   // Consent was given before the interview could start; this only checks the
   // server has storage and this platform can capture.
   const canRecord = !!state?.interview.recordingEnabled && recordingSupported();
   const recorder = useRoundRecorder(live && canRecord, round?.id ?? null);
 
-  const reload = useCallback(() => qc.invalidateQueries({ queryKey: ["interview-room", id] }), [qc, id]);
+  const reload = useCallback(
+    () => qc.invalidateQueries({ queryKey: ["interview-room", id] }),
+    [qc, id],
+  );
 
   const answer = useMutation({
-    mutationFn: ({ text, interrupted }: { text: string; interrupted?: boolean }) =>
-      interviewApi.addTurn(id, round!.id, requestId(), text, interrupted),
+    mutationFn: ({
+      text,
+      interrupted,
+    }: {
+      text: string;
+      interrupted: boolean;
+    }) => interviewApi.addTurn(id, round!.id, requestId(), text, interrupted),
     onSuccess: (r) => {
-      setDraft("");
-      draftRef.current = "";
       qc.setQueryData<RoomState>(["interview-room", id], (prev) =>
         prev
           ? {
@@ -105,12 +95,28 @@ export default function InterviewRoomScreen() {
       if (apiErrorCode(err) === "ROUND_CLOSED") void reload();
     },
   });
+  const sendAnswer = answer.mutateAsync;
+
+  const turn = useVoiceTurn({
+    live,
+    roundKey: round?.id ?? null,
+    silenceLimitMs: (state?.silenceSubmitSeconds ?? 5) * 1000,
+    send: useCallback(
+      (text: string, interrupted: boolean) => sendAnswer({ text, interrupted }),
+      [sendAnswer],
+    ),
+  });
 
   const finish = useMutation({
     mutationFn: async (reason: "timer_expired" | "candidate_finished") => {
       const roundId = round!.id;
       const audio = await recorder.stop();
-      const result = await interviewApi.completeRound(id, roundId, requestId(), reason);
+      const result = await interviewApi.completeRound(
+        id,
+        roundId,
+        requestId(),
+        reason,
+      );
       // After the round is closed, so a slow upload never holds the clock open.
       // It finishes in the background; the report shows the recording once stored.
       if (audio)
@@ -121,7 +127,7 @@ export default function InterviewRoomScreen() {
     },
     onSuccess: (r) => {
       stopSpeaking();
-      mic.stop();
+      turn.stopListening();
       void qc.invalidateQueries({ queryKey: ["interviews"] });
       void qc.invalidateQueries({ queryKey: ["interview", id] });
       if (r.interview.status === "completed")
@@ -135,67 +141,64 @@ export default function InterviewRoomScreen() {
     onSuccess: () => reload(),
   });
 
-  const startListening = mic.start;
-  const stopListening = mic.stop;
-  const sendAnswer = answer.mutate;
-  const sending = answer.isPending || finish.isPending;
-  const silenceLimitMs = (state?.silenceSubmitSeconds ?? 5) * 1000;
-
-  /** Sends what is in the box. A second call while one is in flight does nothing. */
-  const submit = useCallback(
-    (interrupted = false) => {
-      const text = draftRef.current.trim();
-      if (!text || sending) return;
-      dictated.current = false;
-      setSilentMs(0);
-      stopListening();
-      sendAnswer({ text, interrupted });
-    },
-    [sending, stopListening, sendAnswer],
-  );
-
-  // An answer that has clearly left the question is cut short: the mic stops,
+  // An answer that has stayed off the question is cut short: the mic stops,
   // what was said so far is sent, and the interviewer speaks the redirect.
+  const { submit } = turn;
   useRelevanceMonitor({
-    enabled: live && !!state?.realtimeRelevance && mic.listening && !sending,
-    draftRef,
+    enabled: live && !!state?.realtimeRelevance && turn.state === "listening",
+    draftRef: turn.draftRef,
     check: (text) => interviewApi.relevanceCheck(id, round!.id, text),
-    onOffTopic: () => submit(true),
+    onOffTopic: () => void submit(true),
   });
 
-  // The silence clock. It only runs for a dictated answer, restarts on every
-  // sound the recogniser hears, and never sends an empty box.
-  useEffect(() => {
-    if (!live) return;
-    const tick = setInterval(() => {
-      if (!dictated.current || !draftRef.current.trim() || sending) return setSilentMs(0);
-      const idle = Date.now() - lastSound.current;
-      setSilentMs(idle);
-      if (idle >= silenceLimitMs) submit();
-    }, 250);
-    return () => clearInterval(tick);
-  }, [live, sending, silenceLimitMs, submit]);
-
-  // Read each new interviewer question aloud, once.
-  const lastAi = [...(state?.turns ?? [])].reverse().find((t) => t.speaker === "ai");
+  // Read each new interviewer question aloud, once. The mic opens when the
+  // interviewer stops talking (not before, or it would transcribe the question).
+  const lastAi = [...(state?.turns ?? [])]
+    .reverse()
+    .find((t) => t.speaker === "ai");
   const spoken = useRef<string | null>(null);
+  const [audioBlocked, setAudioBlocked] = useState(false);
+  const { startListening, interviewerSpeaking } = turn;
+  const say = useCallback(
+    (line: Turn) => {
+      setAudioBlocked(false);
+      interviewerSpeaking();
+      speak(line.text, voice, {
+        path:
+          state?.interview.voiceEnabled && round
+            ? interviewApi.turnSpeechPath(id, round.id, line.id, voice)
+            : undefined,
+        // After a goodbye the finished interview is shown; after the wrap-up nothing more is asked.
+        onDone:
+          line.kind === "end_call"
+            ? () => void reload()
+            : line.kind === "wrap_up"
+              ? undefined
+              : startListening,
+        onBlocked: () => setAudioBlocked(true),
+      });
+    },
+    [
+      voice,
+      state?.interview.voiceEnabled,
+      round,
+      id,
+      reload,
+      startListening,
+      interviewerSpeaking,
+    ],
+  );
   useEffect(() => {
     // The goodbye after "please end the interview" is said even though the round has closed.
-    if ((live || lastAi?.kind === "end_call") && lastAi && spoken.current !== lastAi.id) {
+    if (
+      (live || lastAi?.kind === "end_call") &&
+      lastAi &&
+      spoken.current !== lastAi.id
+    ) {
       spoken.current = lastAi.id;
-      const turnId = lastAi.id;
-      speak(
-        lastAi.text,
-        voice,
-        state?.interview.voiceEnabled && round
-          ? interviewApi.turnSpeechPath(id, round.id, turnId, voice)
-          : undefined,
-        // The mic opens when the interviewer stops talking (not before, or it would
-        // transcribe the question). After a goodbye the finished interview is shown.
-        lastAi.kind === "end_call" ? () => void reload() : lastAi.kind === "wrap_up" ? undefined : startListening,
-      );
+      say(lastAi);
     }
-  }, [live, lastAi, voice, id, round, state?.interview.voiceEnabled, startListening, reload]);
+  }, [live, lastAi, say]);
   useEffect(() => stopSpeaking, []);
 
   // When the local countdown reaches zero, ask the server to close the round.
@@ -227,7 +230,9 @@ export default function InterviewRoomScreen() {
     );
 
   const { interview } = state;
-  const nextRound = (interview.rounds ?? []).find((r) => r.status === "pending");
+  const nextRound = (interview.rounds ?? []).find(
+    (r) => r.status === "pending",
+  );
 
   if (interview.status === "completed")
     return (
@@ -239,46 +244,32 @@ export default function InterviewRoomScreen() {
       </Screen>
     );
 
-  // Between rounds: the clock is stopped until the candidate starts the next one.
   if (!live)
     return (
-      <Screen title={interview.targetRole} back={false}>
-        <Card>
-          <VStack gap={12}>
-            <Text variant="h3">
-              {round ? `${ROUND_LABEL[round.roundType]} finished` : "Round finished"}
-            </Text>
-            {nextRound ? (
-              <>
-                <Text variant="body-sm" tone="secondary">
-                  Take a breath. The next 10-minute timer starts when you press
-                  the button.
-                </Text>
-                {startNext.isError ? (
-                  <Banner tone="danger" message={apiErrorMessage(startNext.error)} />
-                ) : null}
-                <Button
-                  label={`Start ${ROUND_LABEL[nextRound.roundType].toLowerCase()}`}
-                  size="lg"
-                  loading={startNext.isPending || room.isFetching}
-                  onPress={() => startNext.mutate(nextRound.id)}
-                />
-              </>
-            ) : (
-              <Button
-                label="Back to the interview"
-                onPress={() => navigation.replace("InterviewSession", { id })}
-              />
-            )}
-          </VStack>
-        </Card>
-      </Screen>
+      <RoundBreak
+        title={interview.targetRole}
+        round={round}
+        nextRound={nextRound ?? null}
+        starting={startNext.isPending || room.isFetching}
+        error={startNext.isError ? apiErrorMessage(startNext.error) : null}
+        onStartNext={(roundId) => startNext.mutate(roundId)}
+        onBack={() => navigation.replace("InterviewSession", { id })}
+      />
     );
 
   const remaining = seconds ?? round.remainingSeconds;
   const tone =
-    remaining <= 30 ? "danger" : remaining <= state.warningAtSeconds ? "warning" : null;
-  const busy = answer.isPending || finish.isPending;
+    remaining <= 30
+      ? "danger"
+      : remaining <= state.warningAtSeconds
+        ? "warning"
+        : null;
+  const listening = turn.state === "listening";
+  const busy =
+    turn.state === "finalizing_transcript" ||
+    turn.state === "evaluating_answer" ||
+    finish.isPending;
+  const silenceLimitMs = (state.silenceSubmitSeconds ?? 5) * 1000;
   // The interviewer has closed the round, or (older rounds) has nothing left to ask.
   const planDone =
     round.questionsAsked >= round.questionCount &&
@@ -290,10 +281,19 @@ export default function InterviewRoomScreen() {
       subtitle={`Round ${round.sequence} of ${(interview.rounds ?? []).length} · ${interview.targetRole}`}
       back={false}
       right={
-        <View accessibilityRole="timer" accessibilityLabel={`${remaining} seconds remaining`}>
+        <View
+          accessibilityRole="timer"
+          accessibilityLabel={`${remaining} seconds remaining`}
+        >
           <Text
             variant="display-md"
-            tone={tone === "danger" ? "danger" : tone === "warning" ? "warning" : "primary"}
+            tone={
+              tone === "danger"
+                ? "danger"
+                : tone === "warning"
+                  ? "warning"
+                  : "primary"
+            }
             style={numeric}
           >
             {formatClock(remaining)}
@@ -308,8 +308,14 @@ export default function InterviewRoomScreen() {
             tone={room.isFetching ? "warning" : "success"}
           />
           <StatusChip
-            label={mic.listening ? "Listening" : mic.supported ? "Microphone off" : "Typed answers"}
-            tone={mic.listening ? "info" : "neutral"}
+            label={turn.micSupported ? TURN_LABEL[turn.state] : "Typed answers"}
+            tone={
+              listening
+                ? "info"
+                : busy || turn.state === "interviewer_speaking"
+                  ? "warning"
+                  : "neutral"
+            }
           />
           <StatusChip
             label={
@@ -344,12 +350,25 @@ export default function InterviewRoomScreen() {
           />
         ) : null}
 
+        {audioBlocked && lastAi ? (
+          <Banner
+            tone="warning"
+            title="Your browser needs a tap before it can play sound"
+          >
+            <Button
+              label="Start audio"
+              fullWidth={false}
+              onPress={() => say(lastAi)}
+            />
+          </Banner>
+        ) : null}
+
         <Card>
           <VStack gap={12}>
             {state.turns.map((t) => (
               <TurnBubble key={t.id} turn={t} />
             ))}
-            {answer.isPending ? (
+            {turn.state === "evaluating_answer" ? (
               <Text variant="body-sm" tone="tertiary">
                 The interviewer is considering your answer...
               </Text>
@@ -373,33 +392,18 @@ export default function InterviewRoomScreen() {
           <Banner tone="danger" message={apiErrorMessage(finish.error)} />
         ) : null}
 
-        {mic.problem ? (
-          <Banner
-            tone="warning"
-            title={mic.problem === "blocked" ? "Microphone access is blocked" : "No microphone was found"}
-            message={
-              mic.problem === "blocked"
-                ? "Allow the microphone for this site in your browser's address bar, then press Speak. You can also type your answer and press Send."
-                : "Connect a microphone and press Speak, or type your answer and press Send."
-            }
-          />
-        ) : null}
+        <MicProblemBanner problem={turn.micProblem} />
 
         {!planDone ? (
           <Card>
             <VStack gap={10}>
               <TextInput
-                value={draft}
-                onChangeText={(t) => {
-                  // Typing takes over from dictation: nothing is sent until Send is pressed.
-                  dictated.current = false;
-                  draftRef.current = t;
-                  setDraft(t);
-                }}
+                value={turn.draft}
+                onChangeText={turn.type}
                 multiline
                 editable={!busy}
                 placeholder={
-                  mic.supported
+                  turn.micSupported
                     ? "Press the microphone and speak, or type your answer"
                     : "Type your answer"
                 }
@@ -407,46 +411,47 @@ export default function InterviewRoomScreen() {
                 accessibilityLabel="Your answer"
                 style={styles.input}
               />
+              {turn.interim ? (
+                <View accessibilityLabel="Words being recognised">
+                  <Text variant="body-sm" tone="tertiary">
+                    {turn.interim}…
+                  </Text>
+                </View>
+              ) : null}
               <HStack gap={8} wrap>
-                {mic.supported ? (
+                {turn.micSupported ? (
                   <Button
-                    label={mic.listening ? "Stop" : "Speak"}
+                    label={listening ? "Stop" : "Speak"}
                     variant="secondary"
                     fullWidth={false}
                     disabled={busy}
                     icon={
-                      mic.listening ? (
+                      listening ? (
                         <MicOff size={16} color={palette.text.primary} />
                       ) : (
                         <Mic size={16} color={palette.text.primary} />
                       )
                     }
-                    onPress={() => {
-                      if (mic.listening) {
-                        // Stopping by hand also cancels the automatic send: the
-                        // candidate wants to look at the answer first.
-                        dictated.current = false;
-                        mic.stop();
-                      } else {
-                        stopSpeaking();
-                        mic.start();
-                      }
-                    }}
+                    // Stopping by hand also cancels the automatic send: the
+                    // candidate wants to look at the answer first.
+                    onPress={() =>
+                      listening ? turn.stopListening() : turn.startListening()
+                    }
                   />
                 ) : null}
                 <Button
                   label="Send answer"
                   fullWidth={false}
-                  disabled={!draft.trim() || finish.isPending}
-                  loading={answer.isPending}
+                  disabled={!turn.draft.trim() || finish.isPending}
+                  loading={turn.state === "evaluating_answer"}
                   icon={<Send size={16} color="#FFFFFF" />}
-                  onPress={() => submit()}
+                  onPress={() => void turn.submit()}
                 />
               </HStack>
-              {mic.listening ? (
+              {listening ? (
                 <Text variant="caption" tone="tertiary">
-                  {silentMs >= 1500
-                    ? `Sending your answer in ${Math.max(1, Math.ceil((silenceLimitMs - silentMs) / 1000))}s. Keep talking to continue.`
+                  {turn.silentMs >= 1500
+                    ? `Sending your answer in ${Math.max(1, Math.ceil((silenceLimitMs - turn.silentMs) / 1000))}s. Keep talking to continue.`
                     : `Listening. Your answer is sent after ${Math.round(silenceLimitMs / 1000)} seconds of silence.`}
                 </Text>
               ) : null}
@@ -458,24 +463,12 @@ export default function InterviewRoomScreen() {
           label="Finish this round"
           variant={planDone ? "primary" : "ghost"}
           fullWidth={planDone}
-          disabled={answer.isPending}
+          disabled={turn.state === "evaluating_answer"}
           loading={finish.isPending}
           onPress={() => finish.mutate("candidate_finished")}
         />
       </VStack>
     </Screen>
-  );
-}
-
-function TurnBubble({ turn }: { turn: Turn }) {
-  const ai = turn.speaker === "ai";
-  return (
-    <View style={[styles.bubble, ai ? styles.ai : styles.me]}>
-      <Text variant="overline" tone="tertiary">
-        {ai ? "Interviewer" : "You"}
-      </Text>
-      <Text variant="body">{turn.text}</Text>
-    </View>
   );
 }
 
@@ -492,7 +485,4 @@ const styles = StyleSheet.create({
     padding: 10,
     textAlignVertical: "top",
   },
-  bubble: { padding: 10, borderRadius: radius.md, gap: 2, maxWidth: 720 },
-  ai: { backgroundColor: palette.surface.sunken, alignSelf: "flex-start" },
-  me: { backgroundColor: palette.teal[50], alignSelf: "flex-end" },
 });

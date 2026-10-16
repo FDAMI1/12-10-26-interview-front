@@ -5,6 +5,9 @@ const MIN_WORDS = 15;
 const MIN_NEW_WORDS = 10;
 const MIN_GAP_MS = 6000;
 const TICK_MS = 2000;
+// One verdict over a half-finished answer is not evidence enough to cut in:
+// the answer must still be off the question when checked again.
+const VERDICTS_TO_INTERRUPT = 2;
 
 const wordCount = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0);
 
@@ -23,7 +26,9 @@ interface Options {
  * Live relevance check (web, relevance.mode "realtime"): every few seconds,
  * once the spoken answer has grown, the server judges it so far. One check
  * at a time; a verdict that arrives after the answer was sent or replaced is
- * ignored, so a slow reply can never cut into the next answer.
+ * ignored, so a slow reply can never cut into the next answer. The
+ * interviewer cuts in only after two off-topic verdicts in a row: a sustained
+ * drift, never one partial sentence.
  */
 export function useRelevanceMonitor({
   enabled,
@@ -36,15 +41,22 @@ export function useRelevanceMonitor({
     sink.current = { check, onOffTopic };
   });
   const last = useRef({ at: 0, words: 0 });
+  const offTopicRun = useRef(0);
   const inFlight = useRef(false);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      offTopicRun.current = 0;
+      return;
+    }
     const tick = setInterval(() => {
       const text = draftRef.current;
       const words = wordCount(text);
       // A new answer starts the count again.
-      if (words < last.current.words) last.current = { at: 0, words: 0 };
+      if (words < last.current.words) {
+        last.current = { at: 0, words: 0 };
+        offTopicRun.current = 0;
+      }
       if (
         inFlight.current ||
         words < MIN_WORDS ||
@@ -57,8 +69,12 @@ export function useRelevanceMonitor({
       sink.current
         .check(text)
         .then((offTopic) => {
-          if (offTopic && draftRef.current.startsWith(text))
+          if (!draftRef.current.startsWith(text)) return;
+          offTopicRun.current = offTopic ? offTopicRun.current + 1 : 0;
+          if (offTopicRun.current >= VERDICTS_TO_INTERRUPT) {
+            offTopicRun.current = 0;
             sink.current.onOffTopic();
+          }
         })
         // A failed check never interrupts anyone.
         .catch(() => undefined)

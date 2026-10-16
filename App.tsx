@@ -49,6 +49,9 @@ const linking = {
             screens: {
               InterviewsList: "",
               NewInterview: "new",
+              // Setup screens keep their address, so a refresh resumes them.
+              ResumeSetup: "new/resume",
+              McqSetup: "new/mcq",
               InterviewSession: ":id",
               InterviewRoom: ":id/room",
               InterviewReport: ":id/report",

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { apiClient, apiErrorMessage } from "@api/apiClient";
 import { useDeviceCheck } from "@modules/interview/hooks/useInterviews";
-import { runDeviceCheck } from "@modules/interview/voice";
+import { MicOutcome, runDeviceCheck } from "@modules/interview/voice";
 import { DeviceCheckResult } from "@modules/interview/types";
 import {
   Card,
@@ -14,35 +14,61 @@ import {
 } from "@shared/ui";
 
 const LABELS: Record<keyof DeviceCheckResult, string> = {
-  browserSupported: "Browser supports audio capture",
-  microphone: "Microphone permission",
+  microphone: "Microphone access",
   audioPlayback: "Audio playback",
   network: "Connection to the server",
+  browserSupported: "Browser supports audio capture",
 };
 
-/** Mic, playback and network checks; the clock does not start here (PRD 2.4). */
+const MIC_HELP: Record<
+  Exclude<MicOutcome, "granted">,
+  { title: string; message: string }
+> = {
+  denied: {
+    title: "Microphone access was denied",
+    message:
+      "Your AI interviewer cannot hear you without it. Click the lock or camera icon in your browser's address bar, allow the microphone for this site, then press the button again. On a phone, allow the microphone for your browser in the device settings.",
+  },
+  none: {
+    title: "No microphone was found",
+    message: "Connect or enable a microphone, then press the button again.",
+  },
+  unsupported: {
+    title: "This browser cannot capture audio",
+    message:
+      "Open the interview in a current version of Chrome, Edge or Safari.",
+  },
+};
+
+/** Microphone permission (plus playback and connection); the clock does not start here (PRD 2.4). */
 export function DeviceCheckStep({ interviewId }: { interviewId: string }) {
   const submit = useDeviceCheck(interviewId);
-  const [result, setResult] = useState<DeviceCheckResult | null>(null);
+  const [result, setResult] = useState<
+    (DeviceCheckResult & { micOutcome: MicOutcome }) | null
+  >(null);
   const [running, setRunning] = useState(false);
 
+  // One request per press: the browser prompt is never repeated on its own.
   const run = async () => {
     setRunning(true);
     const r = await runDeviceCheck(() => apiClient.get("/me"));
     setResult(r);
     setRunning(false);
-    if (Object.values(r).every(Boolean)) submit.mutate(r);
+    const { micOutcome, ...checks } = r;
+    if (Object.values(checks).every(Boolean)) submit.mutate(checks);
   };
 
-  const failed = result ? Object.values(result).some((v) => !v) : false;
+  const granted = result?.micOutcome === "granted";
+  const otherFailed = result ? !result.audioPlayback || !result.network : false;
 
   return (
     <Card>
       <VStack gap={12}>
-        <Text variant="h3">Device check</Text>
+        <Text variant="h3">Allow Microphone for Interview</Text>
         <Text variant="body-sm" tone="secondary">
-          We check your microphone, speakers and connection. Your browser will
-          ask for microphone permission.
+          Allow microphone access so your AI interviewer can hear your answers
+          and respond naturally. Check that your microphone is working before
+          starting.
         </Text>
         {result
           ? (Object.keys(LABELS) as (keyof DeviceCheckResult)[]).map((k) => (
@@ -51,24 +77,44 @@ export function DeviceCheckStep({ interviewId }: { interviewId: string }) {
                   {LABELS[k]}
                 </Text>
                 <StatusChip
-                  label={result[k] ? "OK" : "Failed"}
+                  label={
+                    result[k]
+                      ? k === "microphone"
+                        ? "Allowed"
+                        : "OK"
+                      : "Failed"
+                  }
                   tone={result[k] ? "success" : "danger"}
                 />
               </HStack>
             ))
           : null}
-        {failed ? (
+        {granted && !otherFailed && !submit.isError ? (
+          <Banner
+            tone="success"
+            title="Microphone allowed"
+            message="Your interviewer can hear you. You can start the interview."
+          />
+        ) : null}
+        {result && result.micOutcome !== "granted" ? (
           <Banner
             tone="warning"
-            title="Something needs fixing"
-            message="Allow microphone access in your browser, check your connection, then run the check again."
+            title={MIC_HELP[result.micOutcome].title}
+            message={MIC_HELP[result.micOutcome].message}
+          />
+        ) : null}
+        {granted && otherFailed ? (
+          <Banner
+            tone="warning"
+            title="Something else needs fixing"
+            message="Check your connection and that this browser can play sound, then try again."
           />
         ) : null}
         {submit.isError ? (
           <Banner tone="danger" message={apiErrorMessage(submit.error)} />
         ) : null}
         <Button
-          label={result ? "Run check again" : "Run device check"}
+          label={result ? "Try again" : "Allow Microphone and Continue"}
           fullWidth={false}
           loading={running || submit.isPending}
           onPress={() => void run()}

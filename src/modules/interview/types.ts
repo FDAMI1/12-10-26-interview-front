@@ -179,9 +179,11 @@ export const SETUP_LABEL: Record<SetupMode, string> = {
 };
 
 export interface McqQuestion {
+  /** Pool id of a questionnaire question; empty for one the candidate wrote. */
+  id?: string;
   text: string;
   options: string[];
-  /** The option the candidate marks as correct. */
+  /** The option the candidate marks as correct; -1 while unanswered. */
   correctIndex: number;
 }
 
@@ -204,6 +206,8 @@ export interface Preparation {
   questions: McqQuestion[];
   /** A self-assessment questionnaire: the chosen option is the candidate's answer, not a "correct" one. */
   selfAssessment: boolean;
+  /** "Tell us about yourself", in the candidate's own words. */
+  introduction: string;
   updatedAt: string;
 }
 

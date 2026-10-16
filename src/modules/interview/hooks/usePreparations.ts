@@ -31,6 +31,9 @@ export const useSaveMcqSet = () =>
       id ? preparationApi.update(id, body) : preparationApi.createMcq(body),
   );
 
+export const useCreateQuestionnaire = () =>
+  usePreparationMutation(preparationApi.createQuestionnaire);
+
 export const useUpdateRole = () =>
   usePreparationMutation(
     ({ id, targetRole }: { id: string; targetRole: string }) =>
