@@ -18,7 +18,7 @@ export function ForCompanies() {
       <Container className="relative grid gap-12 lg:grid-cols-[0.9fr_1.1fr]">
         <div>
           <p className="text-xs font-semibold tracking-[0.2em] text-sky/80 uppercase">
-            <span className="mr-2 text-sky/50">05</span>For companies
+            <span className="mr-2 text-sky/50">06</span>For companies
           </p>
           <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
             Structured first-round interviews for your <span className="bg-gradient-to-r from-sky to-violet bg-clip-text text-transparent">whole team</span>
@@ -78,7 +78,7 @@ export function Pricing() {
   return (
     <section id="pricing" className="bg-gradient-to-b from-white to-sky/60 py-24">
       <Container>
-        <SectionHeading index="06" eyebrow="Pricing" title="Start free, upgrade" accent="when paid plans launch" center>
+        <SectionHeading index="07" eyebrow="Pricing" title="Start free, upgrade" accent="when paid plans launch" center>
           Your first interview is free today. Paid plans are being prepared and will be listed here with their prices when they are available.
         </SectionHeading>
         <div ref={ref} className="reveal mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">

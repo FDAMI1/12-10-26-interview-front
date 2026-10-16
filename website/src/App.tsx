@@ -3,6 +3,7 @@ import { Hero } from "./components/Hero";
 import { Features, HowItWorks } from "./components/Features";
 import { ReportPreview, WorkspacePreview } from "./components/Previews";
 import { ForCompanies, Pricing } from "./components/Business";
+import { MobileApp } from "./components/MobileApp";
 import { FinalCta, Footer } from "./components/Footer";
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
         <HowItWorks />
         <WorkspacePreview />
         <ReportPreview />
+        <MobileApp />
         <ForCompanies />
         <Pricing />
         <FinalCta />

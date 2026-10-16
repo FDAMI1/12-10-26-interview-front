@@ -1,21 +1,47 @@
-import { Clock3, Mic, Sparkles } from "lucide-react";
+import { BarChart3, Clock3, FileCheck2, Mic, Sparkles } from "lucide-react";
 import { links } from "../config";
 import { Container, DemoBadge, LinkButton } from "./ui";
 
-/** Abstract glass panels behind a small interview card: decorative, marked as a demo. */
+/** Stacked glass panels, the app icon on a frosted tile, and a sample interview card. Decorative. */
 function HeroVisual() {
+  // Each panel: position, size, tilt and fill. Back to front.
+  const panels = [
+    { cls: "top-[2%] right-[4%] h-[56%] w-[44%]", r: "16deg", fill: "from-white/70 via-electric/25 to-violet/40", delay: "0s" },
+    { cls: "top-[10%] right-[18%] h-[56%] w-[44%]", r: "9deg", fill: "from-white/80 via-[#9db4ff]/40 to-electric/35", delay: "-1.5s" },
+    { cls: "top-[18%] left-[4%] h-[50%] w-[40%]", r: "-12deg", fill: "from-violet/40 via-white/60 to-white/80", delay: "-3s" },
+  ];
   return (
-    <div className="relative mx-auto aspect-square w-full max-w-[460px]" aria-hidden>
-      <div className="absolute inset-[8%] rounded-full bg-gradient-to-br from-electric/25 via-violet/20 to-transparent blur-3xl" />
+    <div className="relative mx-auto aspect-square w-full max-w-[480px]" aria-hidden>
+      <div className="absolute inset-[6%] rounded-full bg-gradient-to-br from-electric/30 via-violet/25 to-transparent blur-3xl" />
+      {panels.map((p) => (
+        <div
+          key={p.cls}
+          className={`float absolute ${p.cls} rounded-[2rem] border border-white/80 bg-gradient-to-br ${p.fill} shadow-[var(--shadow-soft)] backdrop-blur-md`}
+          style={{ ["--r" as string]: p.r, animationDelay: p.delay }}
+        >
+          <div className="absolute inset-x-5 top-4 h-1/3 rounded-[1.4rem] bg-gradient-to-b from-white/70 to-transparent" />
+        </div>
+      ))}
+      {/* The app icon on a frosted tile, as in the reference's centre card. */}
       <div
-        className="float absolute top-[6%] right-[8%] h-[58%] w-[46%] rounded-[2rem] border border-white/80 bg-gradient-to-br from-white/80 to-electric/30 shadow-[var(--shadow-soft)] backdrop-blur-md"
-        style={{ ["--r" as string]: "12deg" }}
-      />
-      <div
-        className="float absolute top-[16%] left-[6%] h-[52%] w-[44%] rounded-[2rem] border border-white/70 bg-gradient-to-br from-violet/35 to-white/60 shadow-[var(--shadow-soft)] backdrop-blur-md [animation-delay:-2s]"
-        style={{ ["--r" as string]: "-10deg" }}
-      />
-      <div className="absolute inset-x-[12%] bottom-[6%] rounded-[1.75rem] glass p-5">
+        className="float absolute top-[16%] left-[33%] flex h-[34%] w-[34%] items-center justify-center rounded-[2rem] border border-white/90 bg-white/55 shadow-[var(--shadow-soft)] backdrop-blur-xl"
+        style={{ ["--r" as string]: "6deg", animationDelay: "-2s" }}
+      >
+        <img src="/brand/aivarnix-app-icon.png" alt="" width={96} height={96} className="h-[58%] w-[58%] rounded-[1.4rem] shadow-[var(--shadow-glow)]" />
+      </div>
+      <div className="float absolute top-[6%] left-[2%] z-10 hidden rounded-2xl glass px-3.5 py-2.5 sm:block" style={{ ["--r" as string]: "-5deg", animationDelay: "-4s" }}>
+        <p className="flex items-center gap-1.5 text-xs font-semibold text-navy">
+          <FileCheck2 size={14} className="text-emerald-600" /> Resume read
+        </p>
+        <p className="text-[11px] text-muted">12 skills · 3 projects</p>
+      </div>
+      <div className="float absolute top-[30%] -right-[2%] z-10 hidden rounded-2xl glass px-3.5 py-2.5 sm:block" style={{ ["--r" as string]: "4deg", animationDelay: "-1s" }}>
+        <p className="flex items-center gap-1.5 text-xs font-semibold text-navy">
+          <BarChart3 size={14} className="text-electric" /> Report ready
+        </p>
+        <p className="text-[11px] text-muted">74 / 100 · 3 strengths</p>
+      </div>
+      <div className="absolute inset-x-[10%] bottom-[4%] rounded-[1.75rem] glass p-5">
         <div className="flex items-center gap-3">
           <img src="/brand/aivarnix-app-icon.png" alt="" className="h-11 w-11 rounded-xl" width={44} height={44} />
           <div className="min-w-0">

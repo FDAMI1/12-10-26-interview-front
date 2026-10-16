@@ -1,126 +1,118 @@
 /**
- * AI Interview Design System — "quiet premium" (2026 rev).
+ * Aivarnix design system.
  *
- * The previous system was a consumer-app language (Poppins headings, 26px KPI
- * numbers in 104px colour-coded cards, gradient banners) applied to a
- * data-dense trade tool. The client's verdict: big cards, loose spacing,
- * junior. The fix is DENSITY and RESTRAINT, not new colours:
+ * Navy type on pale-blue surfaces, electric-blue actions, violet accents,
+ * soft rounded cards with a faint blue shadow. Matches the Aivarnix sign-in
+ * screens and website.
  *
- *   1. Body text 13–14px, page titles 20px.
- *   2. One typeface. Inter carries everything; Poppins is gone.
- *   3. Weights stop at 600.
- *   4. Radii locked to 4 / 6 / 8 / 10 / 12.
- *   5. Borders, not shadows. Shadow is for things that genuinely float.
- *   6. The brand green is an ACCENT — primary action, active nav, links,
- *      focus. ~90% of pixels should be neutral.
+ *   1. Body text 13–14px, page titles 20px; one typeface (Inter).
+ *   2. The brand blue is an ACCENT — primary action, active nav, links, focus.
+ *      Most pixels stay neutral.
+ *   3. Every text colour keeps at least 4.5:1 on its background.
  *
  * Token keys are unchanged, so every existing call-site re-skins from here.
  */
 
 export const palette = {
   /**
-   * Ink — near-black tinted very slightly green so it belongs to the brand
+   * Ink — near-black tinted navy so it belongs to the Aivarnix brand
    * family. Pure #000 on pure #FFF is the highest-contrast, cheapest-looking
    * pairing in UI; every considered system tints both ends.
    */
   ink: {
-    900: "#0F1F1B",
-    800: "#152A25",
-    700: "#2C3B37",
-    600: "#44534F",
-    500: "#647572",
-    400: "#93A19E",
-    300: "#C4CDCB",
-    200: "#DFE5E3",
-    100: "#EDF1F0",
-    50: "#F5F8F7",
+    50: "#F5F7FD",
+    100: "#EDF1FA",
+    200: "#DFE4F2",
+    300: "#C3CAE0",
+    400: "#8C96B2",
+    500: "#5B6788",
+    600: "#3F4A6B",
+    700: "#2A3557",
+    800: "#13204F",
+    900: "#0B1640",
   },
 
   /**
-   * Primary brand — AI Interview green. 600 is sampled straight from the logo
-   * ("plus" wordmark + leaf, #10A058); the rest is a tonal ramp around it at the
-   * same hue, so the UI and the logo are the same colour family.
+   * Primary brand — Aivarnix electric blue. 600 is the brand blue; 700 is the
+   * shade used where white text sits on it or it is used as text (4.5:1+).
    *
    * NOTE: the key is still `teal` because ~100 call-sites reference
    * `palette.teal[...]`. `palette.brand` is the preferred alias going forward.
    */
   teal: {
-    900: "#073C21",
-    800: "#0A5730",
-    700: "#0C7942",
-    600: "#10A058", // ← exact logo green
-    500: "#1EB86B",
-    400: "#39D080",
-    300: "#76DBA5",
-    200: "#AEEACC",
-    100: "#D6F5E7",
-    50: "#EEFBF5",
+    50: "#F1F4FF",
+    100: "#E3E9FF",
+    200: "#C9D5FF",
+    300: "#A3B6FF",
+    400: "#7392FF",
+    500: "#4F74FF",
+    600: "#2F5BFF",
+    700: "#2447E6",
+    800: "#1631A8",
+    900: "#0E1E7A",
   },
 
-  // Accent — cobalt blue. Links and "sales" only; no longer a second CTA fill.
+  // Accent — Aivarnix violet. Secondary emphasis; 700 carries white text.
   cobalt: {
-    900: "#0E3F6E",
-    800: "#125C9C",
-    700: "#1673C0",
-    600: "#1E8FE6",
-    500: "#3B9AEA",
-    400: "#5FAAEF",
-    300: "#93C6F4",
-    200: "#BFDDF8",
-    100: "#DCEBFC",
-    50: "#EFF6FE",
+    50: "#F6F3FF",
+    100: "#ECE6FF",
+    200: "#D8CDFF",
+    300: "#BBA9FF",
+    400: "#9B83FF",
+    500: "#8263FF",
+    600: "#6D4AFF",
+    700: "#5634E0",
+    800: "#3E24B8",
+    900: "#2E1A86",
   },
 
-  // Cool neutral surfaces, tinted to match ink.
+  // Neutral surfaces, tinted navy to match ink.
   neutral: {
     0: "#FFFFFF",
-    50: "#F5F8F7",
-    100: "#EDF1F0",
-    200: "#DFE5E3",
-    300: "#C4CDCB",
-    400: "#93A19E",
-    500: "#647572",
-    600: "#44534F",
-    700: "#2C3B37",
-    800: "#152A25",
-    900: "#0F1F1B",
+    900: "#0B1640",
+    800: "#13204F",
+    700: "#2A3557",
+    600: "#3F4A6B",
+    500: "#5B6788",
+    400: "#8C96B2",
+    300: "#C3CAE0",
+    200: "#DFE4F2",
+    100: "#EDF1FA",
+    50: "#F5F7FD",
   },
 
   surface: {
     primary: "#FFFFFF",
-    /** App canvas. Cards are white planes ON this — never white-on-white. */
-    secondary: "#F6F8F8",
-    tertiary: "#F0F4F3",
+    /** App canvas: pale blue. Cards are white planes ON this. */
+    secondary: "#F3F6FE",
+    tertiary: "#EDF1FC",
     raised: "#FFFFFF",
     /** Wells, table header rows, input backgrounds. */
-    sunken: "#F0F4F3",
-    dark: "#101E1A",
-    darkRaised: "#182924",
+    sunken: "#EEF2FC",
+    dark: "#0B1640",
+    darkRaised: "#13204F",
   },
 
   text: {
-    primary: "#0F1F1B",
-    secondary: "#3F4F4C",
-    // 5.1:1 on white. This token carries every section label, hint and
-    // timestamp in the app, so one wrong value fails on every screen at once.
-    tertiary: "#647572",
-    disabled: "#A3AFAC",
+    primary: "#0B1640",
+    secondary: "#2A3557",
+    // 5.6:1 on white; carries every label, hint and timestamp.
+    tertiary: "#5B6788",
+    disabled: "#9AA3BE",
     inverse: "#FFFFFF",
-    accent: "#0C7942", // brand green 700 — passes AA on white
-    // 5.87:1 on white. #1E8FE6 was 3.43:1 — links are body-size text,
-    // so they need the full 4.5:1, not the 3:1 allowed for large text.
-    link: "#1568A8",
+    accent: "#2447E6", // brand blue 700, 6.1:1 on white
+    link: "#2447E6",
   },
 
   border: {
     /** Row dividers inside a card. */
-    subtle: "#EDF1F0",
+    subtle: "#EDF1FA",
     /** The hairline. Every card, table and panel edge in the app. */
-    default: "#E2E8E6",
+    default: "#E1E7F5",
     /** Input borders and anything that must read as interactive. */
-    strong: "#CDD6D4",
-    focus: "#10A058",
-    dark: "#243530",
+    strong: "#C9D2EA",
+    focus: "#2F5BFF",
+    dark: "#1D2A5C",
   },
 
   // Semantic — stock / expiry / billing states. Contrast-checked on white.
@@ -182,14 +174,14 @@ export const darkPalette = {
     disabled: "#5E6B68",
     inverse: "#0F1F1B",
     /** Lifted from 700 to 400: the deep green is unreadable on a dark ground. */
-    accent: "#39D080",
-    link: "#5FAAEF",
+    accent: "#7392FF",
+    link: "#9BB0FF",
   },
   border: {
     subtle: "#26312E",
     default: "#2F3B38",
     strong: "#41504C",
-    focus: "#39D080",
+    focus: "#7392FF",
     dark: "#0B110F",
   },
   // Deep fills, light text — same 4.5:1 discipline as the light set.
@@ -201,7 +193,7 @@ export const darkPalette = {
 
 /** Status accents, re-tuned for a dark ground. */
 export const darkAccents = {
-  teal: { color: "#39D080", tint: "#12301F" },
+  teal: { color: "#7392FF", tint: "#16204A" },
   blue: { color: "#5FAAEF", tint: "#12283D" },
   amber: { color: "#E5B45C", tint: "#33260E" },
   red: { color: "#F08C7C", tint: "#3A1A16" },
@@ -219,12 +211,12 @@ export const darkAccents = {
  * no status gets no colour at all.
  */
 export const accents = {
-  teal: { color: "#10A058", tint: "#E9F7F0" },
-  blue: { color: "#1E8FE6", tint: "#E7F1FC" },
+  teal: { color: "#2F5BFF", tint: "#EEF2FF" },
+  blue: { color: "#2F5BFF", tint: "#EEF2FF" },
   amber: { color: "#C1801C", tint: "#FBF1DC" },
   red: { color: "#DB4B3D", tint: "#FCEAE7" },
-  purple: { color: "#7C6FE0", tint: "#EEECFB" },
-  neutral: { color: "#647572", tint: "#F0F4F3" },
+  purple: { color: "#6D4AFF", tint: "#F1EDFF" },
+  neutral: { color: "#5B6788", tint: "#EEF1F8" },
 } as const;
 
 /**
@@ -271,11 +263,11 @@ export const spacing = {
 export const radius = {
   xs: 4,
   sm: 6,
-  md: 8, // buttons, inputs, chips, icon wells
-  lg: 10, // cards, tables, panels
-  xl: 12, // dialogs, sheets, hero panels
-  "2xl": 14,
-  "3xl": 16,
+  md: 10, // buttons, inputs, chips, icon wells
+  lg: 16, // cards, tables, panels
+  xl: 20, // dialogs, sheets, hero panels
+  "2xl": 22,
+  "3xl": 24,
   full: 9999,
 } as const;
 
@@ -443,7 +435,7 @@ export const typography = {
  * the separating. These exist for things that genuinely float above the page.
  */
 const soft = (y: number, blur: number, opacity: number, elev: number) => ({
-  shadowColor: "#0F1F1B",
+  shadowColor: "#2B3F99",
   shadowOffset: { width: 0, height: y },
   shadowOpacity: opacity,
   shadowRadius: blur,
@@ -460,8 +452,8 @@ export const shadows = {
 } as const;
 
 export const elevation = {
-  /** Cards at rest — flat. */
-  base: shadows.none,
+  /** Cards at rest — a faint blue lift, as in the Aivarnix design. */
+  base: shadows.sm,
   raised: shadows.xs,
   /** Menus, pickers, the FAB. */
   floating: shadows.md,
@@ -488,7 +480,9 @@ export const motion = {
  * panels, where a brand moment is the actual job.
  */
 export const gradients = {
-  hero: ["#0C7942", "#0C7963", "#1873C0"] as const,
+  hero: ["#2F6BFF", "#4B4BFF", "#6D4AFF"] as const,
+  /** Filled primary buttons: deep enough for white labels at 4.5:1+. */
+  primary: ["#2453F0", "#4438E6", "#5B36F0"] as const,
   teal: ["#0FA05C", "#0A6B3B"] as const,
   cobalt: ["#3B9AEA", "#1673C0"] as const,
   light: ["#FFFFFF", "#F6F8F8"] as const,

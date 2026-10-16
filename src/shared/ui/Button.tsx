@@ -17,7 +17,8 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { palette, radius, outline, layout, motion } from "../designSystem";
+import { LinearGradient } from "expo-linear-gradient";
+import { palette, radius, outline, layout, motion, gradients } from "../designSystem";
 import { haptic, type FeedbackTone } from "../touchFeedback";
 import { Text } from "./Text";
 
@@ -178,7 +179,9 @@ export function Button({
             minHeight: s.height,
             paddingHorizontal: s.px,
             paddingVertical: 6,
-            backgroundColor: c.bg,
+            // The primary fill is the brand gradient, drawn underneath the label.
+            backgroundColor: variant === "primary" ? "transparent" : c.bg,
+            overflow: "hidden",
             borderColor: c.border,
             borderWidth: c.borderWidth,
           },
@@ -187,6 +190,15 @@ export function Button({
           animStyle,
         ]}
       >
+        {variant === "primary" ? (
+          <LinearGradient
+            pointerEvents="none"
+            colors={[...gradients.primary]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={StyleSheet.absoluteFill}
+          />
+        ) : null}
         {loading ? (
           <ActivityIndicator color={c.text} size="small" />
         ) : (
@@ -210,9 +222,8 @@ export function Button({
 function getVariantColors(v: Variant) {
   switch (v) {
     case "primary":
-      // 700, not the 600 logo green: button labels are 13–16px (normal-size
-      // text), so the fill needs 4.5:1 against white. 600 gives 3.39, 700 gives
-      // 5.48. Same brand hue, just deep enough to read all day.
+      // Drawn as the blue-to-violet gradient (gradients.primary); this solid
+      // 700 is its border and fallback, 6.1:1 against the white label.
       return {
         bg: palette.teal[700],
         text: "#FFFFFF",
@@ -220,9 +231,7 @@ function getVariantColors(v: Variant) {
         borderWidth: 0,
       };
     case "accent":
-      // 700, not 600 — same reasoning as primary. White on cobalt[600] is
-      // 3.43:1, and these labels ("New sale", "Receive stock") are 15px, so
-      // they need 4.5:1, not the 3:1 allowed for large text. 700 gives 4.94.
+      // Violet 700: white labels need 4.5:1 at 13–15px.
       return {
         bg: palette.cobalt[700],
         text: "#FFFFFF",
