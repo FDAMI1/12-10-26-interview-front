@@ -116,7 +116,15 @@ export function SocialSignIn({ onReturnFailed }: Props = {}) {
     (p) => providers.data?.[p],
   );
   // A message from a provider round trip is still shown even if the list has not loaded.
-  if (!offered.length && !problem && !exchange.isError) return null;
+  if (!offered.length && !problem && !exchange.isError) {
+    // Nothing is configured: say so, quietly, rather than showing dead buttons.
+    if (!providers.data) return null;
+    return (
+      <Text variant="caption" style={styles.notSetUp}>
+        Google and GitHub sign-in are not set up on this server yet.
+      </Text>
+    );
+  }
 
   const busy = exchange.isPending;
   const line = <View style={styles.line} />;
@@ -175,6 +183,7 @@ export function SocialSignIn({ onReturnFailed }: Props = {}) {
 const styles = StyleSheet.create({
   line: { flex: 1, height: 1, backgroundColor: "rgba(47,91,255,0.25)" },
   or: { color: authTheme.muted, letterSpacing: 2.2 },
+  notSetUp: { color: authTheme.muted, textAlign: "center" },
   // Equal-width buttons side by side, icon and provider name, as in the reference design.
   button: {
     flex: 1,
