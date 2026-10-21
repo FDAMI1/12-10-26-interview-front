@@ -9,13 +9,13 @@ window.SITE = {
 };
 
 document.addEventListener("DOMContentLoaded", function () {
-  var s = window.SITE;
+  const s = window.SITE;
   document.querySelectorAll("[data-operator]").forEach(function (el) {
     el.textContent = s.operator || "the operator of Aivarnix";
   });
   document.querySelectorAll("[data-contact]").forEach(function (el) {
     if (s.supportEmail) {
-      var a = document.createElement("a");
+      const a = document.createElement("a");
       a.href = "mailto:" + s.supportEmail;
       a.textContent = s.supportEmail;
       el.textContent = "";

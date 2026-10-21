@@ -9,7 +9,7 @@ export function GitHubMark({ size = 18 }: { size?: number }) {
       width={size}
       height={size}
       viewBox="0 0 16 16"
-      accessibilityElementsHidden
+      aria-hidden
     >
       <Path
         fill={palette.text.primary}

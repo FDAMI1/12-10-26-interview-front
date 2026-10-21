@@ -8,7 +8,7 @@ export function GoogleMark({ size = 18 }: { size?: number }) {
       width={size}
       height={size}
       viewBox="0 0 48 48"
-      accessibilityElementsHidden
+      aria-hidden
     >
       <Path
         fill="#EA4335"
