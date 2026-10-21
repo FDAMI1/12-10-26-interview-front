@@ -1,13 +1,14 @@
 import React, { useState } from "react";
-import * as DocumentPicker from "expo-document-picker";
 import { FileText } from "lucide-react-native";
+import { useRoute, RouteProp } from "@react-navigation/native";
 import {
   useSetupConfig,
   usePreparations,
-  useUploadResume,
   useUpdateRole,
   useDeletePreparation,
 } from "@modules/interview/hooks/usePreparations";
+import { useResumePicker } from "@modules/interview/hooks/useResumePicker";
+import { InterviewsStackParamList } from "@modules/interview/InterviewsNavigator";
 import { StartPreparedInterview } from "@modules/interview/components/StartPreparedInterview";
 import { VerifyEmailCard } from "@modules/auth/components/VerifyEmailCard";
 import { Preparation } from "@modules/interview/types";
@@ -28,37 +29,24 @@ import {
   ConfirmDialog,
 } from "@shared/ui";
 
-const MIME: Record<string, string> = {
-  pdf: "application/pdf",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-};
-
 export default function ResumeSetupScreen() {
   const config = useSetupConfig();
   const resumes = usePreparations("resume");
-  const upload = useUploadResume();
   const updateRole = useUpdateRole();
   const remove = useDeletePreparation();
-  const [pickedId, setPickedId] = useState<string | null>(null);
+  // Opened from the New interview screen with a resume already uploaded or chosen.
+  const { params } =
+    useRoute<RouteProp<InterviewsStackParamList, "ResumeSetup">>();
+  const [pickedId, setPickedId] = useState<string | null>(
+    params?.resumeId ?? null,
+  );
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [tooLarge, setTooLarge] = useState(false);
 
   const picked = resumes.data?.find((r) => r.id === pickedId) ?? null;
   const cfg = config.data;
-
-  const choose = async () => {
-    if (!cfg) return;
-    const result = await DocumentPicker.getDocumentAsync({
-      type: cfg.resumeFormats.map((f) => MIME[f]).filter(Boolean),
-      copyToCacheDirectory: true,
-    });
-    const asset = result.canceled ? null : result.assets[0];
-    if (!asset) return;
-    // Checked again on the server; this just saves uploading a file that will be refused.
-    setTooLarge(Boolean(asset.size && asset.size > cfg.resumeMaxBytes));
-    if (asset.size && asset.size > cfg.resumeMaxBytes) return;
-    upload.mutate(asset, { onSuccess: (p) => setPickedId(p.id) });
-  };
+  const { choose, upload, tooLarge } = useResumePicker(cfg, (p) =>
+    setPickedId(p.id),
+  );
 
   return (
     <Screen

@@ -11,7 +11,7 @@ import McqSetupScreen from "./screens/McqSetupScreen";
 export type InterviewsStackParamList = {
   InterviewsList: undefined;
   NewInterview: undefined;
-  ResumeSetup: undefined;
+  ResumeSetup: { resumeId?: string } | undefined;
   McqSetup: undefined;
   InterviewSession: { id: string };
   InterviewRoom: { id: string };
@@ -30,7 +30,10 @@ export default function InterviewsNavigator() {
       <Stack.Screen name="NewInterview" component={NewInterviewScreen} />
       <Stack.Screen name="ResumeSetup" component={ResumeSetupScreen} />
       <Stack.Screen name="McqSetup" component={McqSetupScreen} />
-      <Stack.Screen name="InterviewSession" component={InterviewSessionScreen} />
+      <Stack.Screen
+        name="InterviewSession"
+        component={InterviewSessionScreen}
+      />
       <Stack.Screen name="InterviewRoom" component={InterviewRoomScreen} />
       <Stack.Screen name="InterviewReport" component={InterviewReportScreen} />
     </Stack.Navigator>
